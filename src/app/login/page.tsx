@@ -15,9 +15,8 @@ export default function LoginPage() {
     setError('');
 
     try {
-      // 1. Force the system to pause for 3.5 seconds so the liquid animation can play!
       await new Promise((resolve) => setTimeout(resolve, 3500));
-
+      
       const response = await fetch('/api/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -25,7 +24,6 @@ export default function LoginPage() {
       });
 
       const data = await response.json();
-
       if (response.ok) {
         localStorage.setItem('user', JSON.stringify(data.user));
         setStatus('success');
@@ -49,11 +47,8 @@ export default function LoginPage() {
       </div>
 
       <div className="group w-full max-w-5xl rounded-[2rem] bg-slate-800/40 backdrop-blur-xl border border-slate-700/50 flex flex-col md:flex-row overflow-hidden relative z-10 shadow-2xl">
-        
         <Link href="/" className="absolute top-6 right-6 md:top-8 md:right-8 w-10 h-10 rounded-full bg-slate-900 border border-slate-700 flex items-center justify-center hover:bg-slate-700 hover:text-fuchsia-400 transition-all duration-300 opacity-0 group-hover:opacity-100 text-slate-400 z-50 shadow-[0_0_15px_rgba(0,0,0,0.5)]">
-          <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"></path>
-          </svg>
+          <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"></path></svg>
         </Link>
         
         <div className="w-full md:w-5/12 bg-slate-900/50 p-12 flex flex-col justify-center border-r border-slate-700/50">
@@ -80,42 +75,40 @@ export default function LoginPage() {
 
             {error && <p className="text-red-400 text-sm font-bold bg-red-500/10 p-3 rounded-lg border border-red-500/20">{error}</p>}
 
-            {/* BULLETPROOF ANIMATED BUTTON */}
+            {/* Static CSS for the Shimmer Effect */}
+            <style>{`
+              @keyframes shimmer {
+                0% { transform: translateX(-100%); }
+                100% { transform: translateX(100%); }
+              }
+            `}</style>
+
             <button 
               type="submit" 
               disabled={status === 'loading'} 
-              className={`relative overflow-hidden flex items-center justify-center w-full font-bold text-xs uppercase tracking-widest py-4 rounded-xl mt-6 transition-colors duration-300 ${
+              className={`relative overflow-hidden flex h-14 w-full items-center justify-center rounded-xl font-bold text-xs uppercase tracking-widest transition-all duration-300 mt-6 ${
                 status === 'loading' 
-                  ? 'text-white shadow-[0_0_25px_rgba(192,38,211,0.4)] bg-slate-900 border-transparent' 
+                  ? 'cursor-wait bg-slate-800 text-slate-400 border border-slate-700 shadow-inner' 
                   : 'bg-white text-black hover:bg-slate-200 border-transparent'
               }`}
             >
-              {/* This inline style guarantees the slide-in animation works perfectly */}
-              <div 
-                className="absolute top-0 left-0 w-full h-full bg-gradient-to-r from-fuchsia-600 to-indigo-600 z-0"
-                style={{
-                  transform: status === 'loading' ? 'translateX(0%)' : 'translateX(-100%)',
-                  transition: 'transform 3.5s ease-out'
-                }}
-              ></div>
+              {/* SKELETON METALLIC GLARE */}
+              {status === 'loading' && (
+                <div 
+                  className="absolute inset-0 w-full h-full bg-gradient-to-r from-transparent via-white/10 to-transparent -skew-x-12"
+                  style={{ animation: 'shimmer 1.5s infinite' }}
+                ></div>
+              )}
 
               <div className="relative z-10 flex items-center gap-3">
                 {status === 'loading' ? (
-                  <>
-                    <div className="flex gap-1 items-center justify-center">
-                      <div className="w-1.5 h-1.5 bg-white rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-                      <div className="w-1.5 h-1.5 bg-white rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
-                      <div className="w-1.5 h-1.5 bg-white rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
-                    </div>
-                    <span className="tracking-[0.2em] drop-shadow-md">Authenticating</span>
-                  </>
+                  <span className="tracking-[0.2em]">AUTHENTICATING...</span>
                 ) : (
-                  'Sign In to Dashboard'
+                  'SIGN IN TO DASHBOARD'
                 )}
               </div>
             </button>
           </form>
-
           <p className="text-center text-xs font-medium text-slate-500 mt-8 relative z-20">
             Don't have an account? <Link href="/register" className="text-white font-bold hover:underline cursor-pointer transition">Sign up for free</Link>
           </p>

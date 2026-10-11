@@ -1,3 +1,15 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+/* ==========================================
+   ROLEMATCH CUSTOM ANIMATIONS
+   Bypasses React hydration and OS motion settings
+   ========================================== */
+@keyframes liquidFill {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(0%); }
+}
+
+.animate-liquid-fill {
+  animation: liquidFill 3.5s ease-out forwards !important;
+}
