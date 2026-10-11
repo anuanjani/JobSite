@@ -1,21 +1,27 @@
 import React from 'react';
 import Navbar from '../../components/Navbar';
+import Link from 'next/link';
 
 export default function StaticPage() {
   return (
     <div className="min-h-screen bg-slate-900 text-slate-100 font-sans selection:bg-fuchsia-500/30 flex flex-col relative">
       
-      {/* ALIGNED NAVBAR */}
       <div className="max-w-[1400px] mx-auto w-full p-6 md:p-8 relative z-20">
         <Navbar />
       </div>
       
-      {/* MAIN CONTENT */}
-      <main className="flex-grow max-w-[1000px] mx-auto w-full p-6 md:p-12 mt-10 mb-20">
-        <div className="bg-slate-800/40 backdrop-blur-xl border border-slate-700/50 rounded-[2rem] p-8 md:p-16 shadow-2xl relative overflow-hidden">
+      <main className="flex-grow max-w-[1000px] mx-auto w-full p-6 md:p-12 mt-10 mb-20 relative z-10">
+        {/* ADDED 'group' TO THE WRAPPER */}
+        <div className="group bg-slate-800/40 backdrop-blur-xl border border-slate-700/50 rounded-[2rem] p-8 md:p-16 shadow-2xl relative overflow-hidden">
+          
+          {/* CLOSE (X) BUTTON - NOW HAS opacity-0 group-hover:opacity-100 */}
+          <Link href="/" className="absolute top-6 right-6 md:top-8 md:right-8 w-10 h-10 rounded-full bg-slate-900 border border-slate-700 flex items-center justify-center hover:bg-slate-700 text-slate-500 hover:text-fuchsia-400 opacity-0 group-hover:opacity-100 transition-all duration-300 z-50 shadow-lg">
+            <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"></path></svg>
+          </Link>
+
           <div className="absolute top-[-20%] right-[-10%] w-[400px] h-[400px] bg-fuchsia-600/10 blur-[120px] rounded-full pointer-events-none"></div>
           
-          <h1 className="text-4xl md:text-5xl font-extrabold tracking-tighter text-white mb-6 relative z-10">
+          <h1 className="text-4xl md:text-5xl font-extrabold tracking-tighter text-white mb-6 relative z-10 pr-12">
             Terms & Conditions
           </h1>
           
@@ -39,8 +45,6 @@ export default function StaticPage() {
           </div>
         </div>
       </main>
-      
-      {/* Note: Footer component was intentionally removed here to stop it from rendering twice. */}
     </div>
   );
 }

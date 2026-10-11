@@ -9,11 +9,18 @@ export default function EmployerHome() {
         <Navbar />
       </div>
       
-      <main className="flex-grow max-w-[1200px] mx-auto w-full p-6 md:p-12 mt-10 mb-20 relative z-10 flex flex-col items-center justify-center text-center">
+      {/* ADDED 'group' TO MAIN TAG */}
+      <main className="group flex-grow max-w-[1200px] mx-auto w-full p-6 md:p-12 mt-10 mb-20 relative z-10 flex flex-col items-center justify-center text-center">
+        
+        {/* CLOSE (X) BUTTON - NOW HAS opacity-0 group-hover:opacity-100 */}
+        <Link href="/" className="absolute top-0 right-6 md:right-8 w-10 h-10 rounded-full bg-slate-900 border border-slate-700 flex items-center justify-center hover:bg-slate-700 text-slate-500 hover:text-fuchsia-400 opacity-0 group-hover:opacity-100 transition-all duration-300 z-50 shadow-lg">
+          <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"></path></svg>
+        </Link>
+
         <div className="absolute top-[10%] left-[20%] w-[500px] h-[500px] bg-fuchsia-600/10 blur-[150px] rounded-full pointer-events-none"></div>
         <div className="absolute bottom-[10%] right-[20%] w-[500px] h-[500px] bg-indigo-600/10 blur-[150px] rounded-full pointer-events-none"></div>
 
-        <span className="text-fuchsia-400 font-bold tracking-widest text-sm uppercase mb-6 bg-fuchsia-500/10 px-4 py-1.5 rounded-full border border-fuchsia-500/20 shadow-sm">
+        <span className="text-fuchsia-400 font-bold tracking-widest text-sm uppercase mb-6 bg-fuchsia-500/10 px-4 py-1.5 rounded-full border border-fuchsia-500/20 shadow-sm mt-8">
           Employer Portal
         </span>
         <h1 className="text-5xl md:text-7xl font-extrabold tracking-tighter text-white mb-6 leading-[1.1]">
