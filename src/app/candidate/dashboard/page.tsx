@@ -370,7 +370,7 @@ export default function CandidateDashboardPage() {
               <div className="flex items-center gap-3 mb-4">
                 <h2 className="text-lg font-bold text-white">Resume headline</h2>
                 <button onClick={() => setEditing('resumeHeadline')} className="focus:outline-none group mt-0.5" title="Edit Resume headline">
-                  <svg className="w-[18px] h-[18px] text-slate-400 group-hover:text-blue-400 group-hover:scale-125 transition-all duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
+                  <svg className="w-[18px] h-[18px] text-slate-400 group-hover:text-blue-400 group-hover:scale-110 transition-all duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
                 </button>
               </div>
               <p className={`text-sm leading-relaxed ${profile.resumeHeadline ? 'text-slate-300' : 'text-slate-600 italic'}`}>
@@ -383,7 +383,7 @@ export default function CandidateDashboardPage() {
               <div className="flex items-center gap-3 mb-6">
                 <h2 className="text-lg font-bold text-white">Key skills</h2>
                 <button onClick={() => { setEditing('keySkills'); setTempData({...profile}); }} className="focus:outline-none group mt-0.5" title="Edit Key skills">
-                  <svg className="w-[18px] h-[18px] text-slate-400 group-hover:text-blue-400 group-hover:scale-125 transition-all duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
+                  <svg className="w-[18px] h-[18px] text-slate-400 group-hover:text-blue-400 group-hover:scale-110 transition-all duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
                 </button>
               </div>
               
@@ -405,7 +405,7 @@ export default function CandidateDashboardPage() {
               <div className="flex items-center gap-3 mb-4">
                 <h2 className="text-lg font-bold text-white">Employment</h2>
                 <button onClick={() => setEditing('employment')} className="focus:outline-none group mt-0.5" title="Edit Employment">
-                  <svg className="w-[18px] h-[18px] text-slate-400 group-hover:text-blue-400 group-hover:scale-125 transition-all duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
+                  <svg className="w-[18px] h-[18px] text-slate-400 group-hover:text-blue-400 group-hover:scale-110 transition-all duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
                 </button>
               </div>
               <p className="text-sm text-slate-500 italic">Please add your employment details.</p>
@@ -416,7 +416,7 @@ export default function CandidateDashboardPage() {
               <div className="flex items-center gap-3 mb-4">
                 <h2 className="text-lg font-bold text-white">Education</h2>
                 <button onClick={() => setEditing('education')} className="focus:outline-none group mt-0.5" title="Edit Education">
-                  <svg className="w-[18px] h-[18px] text-slate-400 group-hover:text-blue-400 group-hover:scale-125 transition-all duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
+                  <svg className="w-[18px] h-[18px] text-slate-400 group-hover:text-blue-400 group-hover:scale-110 transition-all duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
                 </button>
               </div>
               <p className="text-sm text-slate-500 italic">Please add your educational qualification.</p>
@@ -427,7 +427,7 @@ export default function CandidateDashboardPage() {
               <div className="flex items-center gap-3 mb-4">
                 <h2 className="text-lg font-bold text-white">IT skills</h2>
                 <button onClick={() => setEditing('itSkills')} className="focus:outline-none group mt-0.5" title="Edit IT skills">
-                  <svg className="w-[18px] h-[18px] text-slate-400 group-hover:text-blue-400 group-hover:scale-125 transition-all duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
+                  <svg className="w-[18px] h-[18px] text-slate-400 group-hover:text-blue-400 group-hover:scale-110 transition-all duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
                 </button>
               </div>
               <p className="text-sm text-slate-500 italic">Add your IT skills.</p>
@@ -438,7 +438,7 @@ export default function CandidateDashboardPage() {
               <div className="flex items-center gap-3 mb-4">
                 <h2 className="text-lg font-bold text-white">Projects</h2>
                 <button onClick={() => setEditing('projects')} className="focus:outline-none group mt-0.5" title="Edit Projects">
-                  <svg className="w-[18px] h-[18px] text-slate-400 group-hover:text-blue-400 group-hover:scale-125 transition-all duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
+                  <svg className="w-[18px] h-[18px] text-slate-400 group-hover:text-blue-400 group-hover:scale-110 transition-all duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
                 </button>
               </div>
               <p className="text-sm text-slate-500 italic">Add projects you have worked on.</p>
@@ -449,7 +449,7 @@ export default function CandidateDashboardPage() {
               <div className="flex items-center gap-3 mb-4">
                 <h2 className="text-lg font-bold text-white">Profile summary</h2>
                 <button onClick={() => setEditing('profileSummary')} className="focus:outline-none group mt-0.5" title="Edit Profile summary">
-                  <svg className="w-[18px] h-[18px] text-slate-400 group-hover:text-blue-400 group-hover:scale-125 transition-all duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
+                  <svg className="w-[18px] h-[18px] text-slate-400 group-hover:text-blue-400 group-hover:scale-110 transition-all duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
                 </button>
               </div>
               <p className="text-sm text-slate-500 italic">Add a brief summary of your overall career highlights and core competencies.</p>
@@ -460,7 +460,7 @@ export default function CandidateDashboardPage() {
               <div className="flex items-center gap-3 mb-4">
                 <h2 className="text-lg font-bold text-white">Accomplishments</h2>
                 <button onClick={() => setEditing('accomplishments')} className="focus:outline-none group mt-0.5" title="Edit Accomplishments">
-                  <svg className="w-[18px] h-[18px] text-slate-400 group-hover:text-blue-400 group-hover:scale-125 transition-all duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
+                  <svg className="w-[18px] h-[18px] text-slate-400 group-hover:text-blue-400 group-hover:scale-110 transition-all duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
                 </button>
               </div>
               <p className="text-sm text-slate-500 italic">Add certifications, publications, awards, or patents.</p>
@@ -471,7 +471,7 @@ export default function CandidateDashboardPage() {
               <div className="flex items-center gap-3 mb-4">
                 <h2 className="text-lg font-bold text-white">Career profile</h2>
                 <button onClick={() => setEditing('careerProfile')} className="focus:outline-none group mt-0.5" title="Edit Career profile">
-                  <svg className="w-[18px] h-[18px] text-slate-400 group-hover:text-blue-400 group-hover:scale-125 transition-all duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
+                  <svg className="w-[18px] h-[18px] text-slate-400 group-hover:text-blue-400 group-hover:scale-110 transition-all duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
                 </button>
               </div>
               <p className="text-sm text-slate-500 italic">Add desired career profile, preferred industry, and job type.</p>
@@ -482,7 +482,7 @@ export default function CandidateDashboardPage() {
               <div className="flex items-center gap-3 mb-4">
                 <h2 className="text-lg font-bold text-white">Personal details</h2>
                 <button onClick={() => { setEditing('basic'); setTempData({ name: profile.name, role: profile.role, location: profile.location, phone: profile.phone }); }} className="focus:outline-none group mt-0.5" title="Edit Personal details">
-                  <svg className="w-[18px] h-[18px] text-slate-400 group-hover:text-blue-400 group-hover:scale-125 transition-all duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
+                  <svg className="w-[18px] h-[18px] text-slate-400 group-hover:text-blue-400 group-hover:scale-110 transition-all duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
                 </button>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-4 gap-x-8 text-sm text-slate-300">
