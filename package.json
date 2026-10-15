@@ -5,6 +5,7 @@
     "dev": "next dev"
   },
   "dependencies": {
+    "@neondatabase/serverless": "^1.2.0",
     "@tailwindcss/postcss": "^4.3.3",
     "@uploadthing/react": "^7.3.3",
     "next": "latest",

@@ -7,8 +7,12 @@ export default function SettingsPage() {
   const router = useRouter();
   const [userName, setUserName] = useState('Loading...');
   const [userInitials, setUserInitials] = useState('');
+  const [userEmail, setUserEmail] = useState('');
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState('Communication and Privacy');
+  const [activeTab, setActiveTab] = useState('Account');
+  const [showManageDropdown, setShowManageDropdown] = useState(true);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -16,6 +20,7 @@ export default function SettingsPage() {
     if (savedUser) {
       const parsed = JSON.parse(savedUser);
       setUserName(parsed.name);
+      setUserEmail(parsed.email);
       setUserInitials(parsed.name.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase());
     } else {
       router.push('/login');
@@ -31,6 +36,28 @@ export default function SettingsPage() {
   const handleLogout = () => {
     localStorage.removeItem('user');
     router.push('/login');
+  };
+
+  const handleDeleteAccount = async () => {
+    if (!userEmail) return;
+    setIsDeleting(true);
+    try {
+      const res = await fetch(`/api/user/delete?email=${encodeURIComponent(userEmail)}`, {
+        method: 'DELETE',
+      });
+      if (res.ok) {
+        localStorage.removeItem('user');
+        router.push('/');
+      } else {
+        alert('Failed to delete account. Please try again.');
+        setIsDeleting(false);
+        setShowDeleteModal(false);
+      }
+    } catch (err) {
+      console.error(err);
+      setIsDeleting(false);
+      setShowDeleteModal(false);
+    }
   };
 
   const tabs = ['Communication and Privacy', 'Account', 'Job Preferences', 'Block Companies'];
@@ -68,7 +95,7 @@ export default function SettingsPage() {
                 <div className="absolute right-0 mt-3 w-64 bg-slate-800 border border-slate-600 rounded-2xl shadow-[0_10px_40px_rgba(0,0,0,0.5)] overflow-hidden z-50">
                   <div className="p-4 border-b border-slate-700">
                     <h3 className="font-bold text-white">{userName}</h3>
-                    <Link href="/candidate/profile" className="text-[10px] font-bold text-fuchsia-400 hover:text-fuchsia-300">View Profile</Link>
+                    <Link href="/candidate/dashboard" className="text-[10px] font-bold text-fuchsia-400 hover:text-fuchsia-300">View Profile</Link>
                   </div>
                   <div className="p-2 flex flex-col">
                     <Link href="/candidate/dashboard" className="px-4 py-3 text-sm font-bold text-slate-300 hover:bg-slate-700 rounded-xl transition">Dashboard</Link>
@@ -115,7 +142,6 @@ export default function SettingsPage() {
                   <p className="text-sm text-slate-400">Where are you in your job search?</p>
                 </div>
 
-                {/* Option 1: Immediately looking */}
                 <div className="rounded-xl border border-fuchsia-500/50 bg-fuchsia-500/5 overflow-hidden">
                   <div className="p-6">
                     <div className="flex justify-between items-start mb-4">
@@ -145,40 +171,48 @@ export default function SettingsPage() {
                   </div>
                 </div>
 
-                {/* Option 2: Not actively looking */}
                 <div className="rounded-xl border border-slate-700 bg-slate-900/50 p-6 hover:border-slate-500 transition cursor-pointer">
                     <div className="flex justify-between items-start mb-4">
                       <div>
                         <h3 className="text-lg font-bold text-white mb-1">Not actively looking but open for opportunities</h3>
-                        <p className="text-sm text-slate-400">Recommended for candidates who are not looking for job opportunities right now but open to occasionally receiving relevant job opportunities from employer and RoleMatch.</p>
+                        <p className="text-sm text-slate-400">Recommended for candidates who are not looking for job opportunities right now but open to occasionally receiving relevant job opportunities.</p>
                       </div>
                       <button className="text-sm font-bold text-fuchsia-400 hover:text-fuchsia-300 transition">Customize</button>
-                    </div>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
-                      <div className="space-y-3">
-                         <p className="text-sm text-slate-300 flex items-center gap-2"><span className="text-emerald-500">✓</span> Job recommendations</p>
-                         <p className="text-sm text-slate-300 flex items-center gap-2"><span className="text-emerald-500">✓</span> Job status updates</p>
-                      </div>
-                      <div className="space-y-3">
-                         <p className="text-sm text-slate-500 flex items-center gap-2"><span className="text-slate-600">✕</span> Jobs & messages from recruiters</p>
-                         <p className="text-sm text-slate-300 flex items-center gap-2"><span className="text-emerald-500">✓</span> Who viewed my profile</p>
-                      </div>
                     </div>
                 </div>
               </div>
             )}
 
-            {/* Placeholder for other tabs */}
+            {/* Account Tab with Manage & Delete Functionality */}
             {activeTab === 'Account' && (
               <div className="rounded-[2rem] bg-slate-800/40 backdrop-blur-md border border-slate-700/50 p-8">
-                <div className="flex justify-between items-center cursor-pointer hover:bg-slate-700/30 p-4 rounded-xl transition">
+                <div 
+                  onClick={() => setShowManageDropdown(!showManageDropdown)} 
+                  className="flex justify-between items-center cursor-pointer hover:bg-slate-700/30 p-4 rounded-xl transition"
+                >
                   <div>
                     <h3 className="text-lg font-bold text-white">Manage account</h3>
                     <p className="text-sm text-slate-400">Deactivate or permanently delete your RoleMatch account</p>
                   </div>
-                  <span className="text-slate-400">▼</span>
+                  <span className={`text-slate-400 transition-transform duration-300 ${showManageDropdown ? 'rotate-180' : ''}`}>▼</span>
                 </div>
+
+                {showManageDropdown && (
+                  <div className="mt-6 pt-6 border-t border-slate-700/50 px-4 space-y-6">
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                      <div>
+                        <h4 className="text-sm font-bold text-white">Permanently Delete Account</h4>
+                        <p className="text-xs text-slate-400 mt-0.5">This action is irreversible and removes all your profile data.</p>
+                      </div>
+                      <button 
+                        onClick={() => setShowDeleteModal(true)}
+                        className="bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 px-5 py-2.5 rounded-xl font-bold text-xs transition-colors shrink-0"
+                      >
+                        Delete Account
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
@@ -199,6 +233,34 @@ export default function SettingsPage() {
           </main>
         </div>
       </div>
+
+      {/* Confirmation Modal */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 z-[999999] flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="bg-slate-900 border border-slate-700 rounded-2xl max-w-md w-full p-8 shadow-2xl relative">
+            <h3 className="text-xl font-bold text-white mb-3">Are you absolutely sure?</h3>
+            <p className="text-sm text-slate-400 mb-6 leading-relaxed">
+              This will permanently delete your account, resume, applications, and remove your data from Rolematch servers.
+            </p>
+            <div className="flex gap-4">
+              <button 
+                onClick={() => setShowDeleteModal(false)}
+                disabled={isDeleting}
+                className="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold py-3 rounded-xl text-sm transition-colors"
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={handleDeleteAccount}
+                disabled={isDeleting}
+                className="flex-1 bg-red-600 hover:bg-red-500 disabled:bg-slate-800 text-white font-bold py-3 rounded-xl text-sm transition-colors shadow-lg shadow-red-600/30"
+              >
+                {isDeleting ? 'Deleting...' : 'Yes, Delete'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
