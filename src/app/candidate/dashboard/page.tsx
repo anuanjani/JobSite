@@ -10,23 +10,21 @@ export default function CandidateDashboardPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const resumeInputRef = useRef<HTMLInputElement>(null);
   
+  // Added projects and profileSummary to prevent TypeScript errors!
   const [profile, setProfile] = useState({
     name: '', email: '', role: '', location: '', phone: '', avatar: '', 
-    resumeUrl: '', resumeHeadline: '', keySkills: [] as string[], employment: [], education: []
+    resumeUrl: '', resumeHeadline: '', keySkills: [] as string[], employment: [], education: [],
+    projects: [], profileSummary: ''
   });
 
   const [editing, setEditing] = useState<string | null>(null);
   const [tempData, setTempData] = useState<any>({});
   
-  // ==========================================
-  // LIVE AUTO-SUGGEST STATES
-  // ==========================================
   const [newSkill, setNewSkill] = useState('');
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [isFetchingSuggestions, setIsFetchingSuggestions] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
 
-  // Live Auto-Suggest API Fetcher
   useEffect(() => {
     const fetchSuggestions = async () => {
       if (!newSkill.trim() || newSkill.length < 2) {
@@ -58,9 +56,6 @@ export default function CandidateDashboardPage() {
     return () => clearTimeout(timeoutId);
   }, [newSkill, tempData.keySkills]);
 
-  // ==========================================
-  // CORE LIFECYCLE & SAVING
-  // ==========================================
   useEffect(() => {
     const savedUser = localStorage.getItem('user');
     if (savedUser) {
@@ -107,7 +102,6 @@ export default function CandidateDashboardPage() {
     if (file && profile.email) {
       setIsUploading(true);
       
-      // ORPHAN FILE CLEANUP
       if (profile.avatar) {
         try { await fetch('/api/delete-file', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fileUrl: profile.avatar }) }); } catch (e) {}
       }
@@ -128,7 +122,6 @@ export default function CandidateDashboardPage() {
     if (file && profile.email) {
       setIsUploadingResume(true);
       
-      // ORPHAN FILE CLEANUP
       if (profile.resumeUrl) {
         try { await fetch('/api/delete-file', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fileUrl: profile.resumeUrl }) }); } catch (e) {}
       }
@@ -145,7 +138,6 @@ export default function CandidateDashboardPage() {
   };
 
   const handleDeleteResume = async () => {
-    // ORPHAN FILE CLEANUP
     if (profile.resumeUrl) {
       try { await fetch('/api/delete-file', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fileUrl: profile.resumeUrl }) }); } catch (e) {}
     }
@@ -185,9 +177,6 @@ export default function CandidateDashboardPage() {
     </div>
   );
 
-  // ==========================================
-  // SIDEBAR LOGIC (WITH CHECKMARKS)
-  // ==========================================
   const sidebarLinks = [
     { name: 'Resume', isCompleted: !!profile.resumeUrl },
     { name: 'Resume headline', isCompleted: !!profile.resumeHeadline },
@@ -195,7 +184,11 @@ export default function CandidateDashboardPage() {
     { name: 'Employment', isCompleted: profile.employment?.length > 0 },
     { name: 'Education', isCompleted: profile.education?.length > 0 },
     { name: 'IT skills', isCompleted: false },
-    { name: 'Projects', isCompleted: false }
+    { name: 'Projects', isCompleted: profile.projects?.length > 0 || false },
+    { name: 'Profile summary', isCompleted: !!profile.profileSummary },
+    { name: 'Accomplishments', isCompleted: false },
+    { name: 'Career profile', isCompleted: false },
+    { name: 'Personal details', isCompleted: !!(profile.location && profile.phone) }
   ];
 
   return (
@@ -370,39 +363,27 @@ export default function CandidateDashboardPage() {
               </div>
             </div>
 
-            {/* ================= RESUME HEADLINE ================= */}
+            {/* ================= PENCIL ICONS ADDED BELOW ================= */}
+
+            {/* RESUME HEADLINE */}
             <div id="resume-headline" className="bg-slate-800/40 backdrop-blur-md border border-slate-700/50 rounded-2xl p-8 shadow-xl">
-              <div className="flex justify-between items-center mb-4">
-                <h2 className="text-lg font-bold text-white flex items-center gap-2">Resume headline</h2>
-                {editing !== 'headline' && <button onClick={() => { setEditing('headline'); setTempData({ resumeHeadline: profile.resumeHeadline }); }} className="text-blue-400 text-sm font-bold hover:text-blue-300 transition-colors">{profile.resumeHeadline ? 'Edit' : 'Add Headline'}</button>}
+              <div className="flex items-center gap-3 mb-4">
+                <h2 className="text-lg font-bold text-white">Resume headline</h2>
+                <button onClick={() => setEditing('resumeHeadline')} className="focus:outline-none group mt-0.5" title="Edit Resume headline">
+                  <svg className="w-[18px] h-[18px] text-slate-400 group-hover:text-blue-400 group-hover:scale-125 transition-all duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
+                </button>
               </div>
-              {editing === 'headline' ? (
-                <div className="space-y-4">
-                  <textarea 
-                    rows={4} 
-                    placeholder="e.g. Lead Consultant seeking roles in Test Management..." 
-                    value={tempData.resumeHeadline ?? profile.resumeHeadline} 
-                    onChange={e => setTempData({...tempData, resumeHeadline: e.target.value})} 
-                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-sm text-white focus:border-blue-500 outline-none resize-none"
-                  ></textarea>
-                  <div className="flex gap-3">
-                    <button onClick={() => handleSave('headline')} className="bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs py-2 px-6 rounded-lg transition-colors">Save</button>
-                    <button onClick={() => setEditing(null)} className="text-slate-400 hover:text-white font-bold text-xs py-2 px-4 transition-colors">Cancel</button>
-                  </div>
-                </div>
-              ) : (
-                <p className={`text-sm leading-relaxed ${profile.resumeHeadline ? 'text-slate-300' : 'text-slate-600 italic'}`}>{profile.resumeHeadline || 'Add a summary of your experience and career goals to grab recruiter attention.'}</p>
-              )}
+              <p className={`text-sm leading-relaxed ${profile.resumeHeadline ? 'text-slate-300' : 'text-slate-600 italic'}`}>
+                {profile.resumeHeadline || 'Add a summary of your experience and career goals to grab recruiter attention.'}
+              </p>
             </div>
 
-            {/* ================= KEY SKILLS (DISPLAY VIEW) ================= */}
+            {/* KEY SKILLS */}
             <div id="key-skills" className="bg-slate-800/40 backdrop-blur-md border border-slate-700/50 rounded-2xl p-8 shadow-xl">
               <div className="flex items-center gap-3 mb-6">
                 <h2 className="text-lg font-bold text-white">Key skills</h2>
-                <button onClick={() => { setEditing('skills'); setTempData({ keySkills: profile.keySkills }); }} className="text-slate-400 hover:text-blue-400 transition-colors">
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path>
-                  </svg>
+                <button onClick={() => { setEditing('keySkills'); setTempData({...profile}); }} className="focus:outline-none group mt-0.5" title="Edit Key skills">
+                  <svg className="w-[18px] h-[18px] text-slate-400 group-hover:text-blue-400 group-hover:scale-125 transition-all duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
                 </button>
               </div>
               
@@ -419,15 +400,106 @@ export default function CandidateDashboardPage() {
               </div>
             </div>
 
+            {/* EMPLOYMENT */}
+            <div id="employment" className="bg-slate-800/40 backdrop-blur-md border border-slate-700/50 rounded-2xl p-8 shadow-xl scroll-mt-24">
+              <div className="flex items-center gap-3 mb-4">
+                <h2 className="text-lg font-bold text-white">Employment</h2>
+                <button onClick={() => setEditing('employment')} className="focus:outline-none group mt-0.5" title="Edit Employment">
+                  <svg className="w-[18px] h-[18px] text-slate-400 group-hover:text-blue-400 group-hover:scale-125 transition-all duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
+                </button>
+              </div>
+              <p className="text-sm text-slate-500 italic">Please add your employment details.</p>
+            </div>
+
+            {/* EDUCATION */}
+            <div id="education" className="bg-slate-800/40 backdrop-blur-md border border-slate-700/50 rounded-2xl p-8 shadow-xl scroll-mt-24">
+              <div className="flex items-center gap-3 mb-4">
+                <h2 className="text-lg font-bold text-white">Education</h2>
+                <button onClick={() => setEditing('education')} className="focus:outline-none group mt-0.5" title="Edit Education">
+                  <svg className="w-[18px] h-[18px] text-slate-400 group-hover:text-blue-400 group-hover:scale-125 transition-all duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
+                </button>
+              </div>
+              <p className="text-sm text-slate-500 italic">Please add your educational qualification.</p>
+            </div>
+
+            {/* IT SKILLS */}
+            <div id="it-skills" className="bg-slate-800/40 backdrop-blur-md border border-slate-700/50 rounded-2xl p-8 shadow-xl scroll-mt-24">
+              <div className="flex items-center gap-3 mb-4">
+                <h2 className="text-lg font-bold text-white">IT skills</h2>
+                <button onClick={() => setEditing('itSkills')} className="focus:outline-none group mt-0.5" title="Edit IT skills">
+                  <svg className="w-[18px] h-[18px] text-slate-400 group-hover:text-blue-400 group-hover:scale-125 transition-all duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
+                </button>
+              </div>
+              <p className="text-sm text-slate-500 italic">Add your IT skills.</p>
+            </div>
+
+            {/* PROJECTS */}
+            <div id="projects" className="bg-slate-800/40 backdrop-blur-md border border-slate-700/50 rounded-2xl p-8 shadow-xl scroll-mt-24">
+              <div className="flex items-center gap-3 mb-4">
+                <h2 className="text-lg font-bold text-white">Projects</h2>
+                <button onClick={() => setEditing('projects')} className="focus:outline-none group mt-0.5" title="Edit Projects">
+                  <svg className="w-[18px] h-[18px] text-slate-400 group-hover:text-blue-400 group-hover:scale-125 transition-all duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
+                </button>
+              </div>
+              <p className="text-sm text-slate-500 italic">Add projects you have worked on.</p>
+            </div>
+
+            {/* PROFILE SUMMARY */}
+            <div id="profile-summary" className="bg-slate-800/40 backdrop-blur-md border border-slate-700/50 rounded-2xl p-8 shadow-xl scroll-mt-24">
+              <div className="flex items-center gap-3 mb-4">
+                <h2 className="text-lg font-bold text-white">Profile summary</h2>
+                <button onClick={() => setEditing('profileSummary')} className="focus:outline-none group mt-0.5" title="Edit Profile summary">
+                  <svg className="w-[18px] h-[18px] text-slate-400 group-hover:text-blue-400 group-hover:scale-125 transition-all duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
+                </button>
+              </div>
+              <p className="text-sm text-slate-500 italic">Add a brief summary of your overall career highlights and core competencies.</p>
+            </div>
+
+            {/* ACCOMPLISHMENTS */}
+            <div id="accomplishments" className="bg-slate-800/40 backdrop-blur-md border border-slate-700/50 rounded-2xl p-8 shadow-xl scroll-mt-24">
+              <div className="flex items-center gap-3 mb-4">
+                <h2 className="text-lg font-bold text-white">Accomplishments</h2>
+                <button onClick={() => setEditing('accomplishments')} className="focus:outline-none group mt-0.5" title="Edit Accomplishments">
+                  <svg className="w-[18px] h-[18px] text-slate-400 group-hover:text-blue-400 group-hover:scale-125 transition-all duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
+                </button>
+              </div>
+              <p className="text-sm text-slate-500 italic">Add certifications, publications, awards, or patents.</p>
+            </div>
+
+            {/* CAREER PROFILE */}
+            <div id="career-profile" className="bg-slate-800/40 backdrop-blur-md border border-slate-700/50 rounded-2xl p-8 shadow-xl scroll-mt-24">
+              <div className="flex items-center gap-3 mb-4">
+                <h2 className="text-lg font-bold text-white">Career profile</h2>
+                <button onClick={() => setEditing('careerProfile')} className="focus:outline-none group mt-0.5" title="Edit Career profile">
+                  <svg className="w-[18px] h-[18px] text-slate-400 group-hover:text-blue-400 group-hover:scale-125 transition-all duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
+                </button>
+              </div>
+              <p className="text-sm text-slate-500 italic">Add desired career profile, preferred industry, and job type.</p>
+            </div>
+
+            {/* PERSONAL DETAILS */}
+            <div id="personal-details" className="bg-slate-800/40 backdrop-blur-md border border-slate-700/50 rounded-2xl p-8 shadow-xl scroll-mt-24">
+              <div className="flex items-center gap-3 mb-4">
+                <h2 className="text-lg font-bold text-white">Personal details</h2>
+                <button onClick={() => { setEditing('basic'); setTempData({ name: profile.name, role: profile.role, location: profile.location, phone: profile.phone }); }} className="focus:outline-none group mt-0.5" title="Edit Personal details">
+                  <svg className="w-[18px] h-[18px] text-slate-400 group-hover:text-blue-400 group-hover:scale-125 transition-all duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
+                </button>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-4 gap-x-8 text-sm text-slate-300">
+                <div><span className="text-slate-500 font-bold uppercase text-[11px] block mb-1">Location</span>{profile.location || <span className="italic text-slate-600">Not added</span>}</div>
+                <div><span className="text-slate-500 font-bold uppercase text-[11px] block mb-1">Phone</span>{profile.phone || <span className="italic text-slate-600">Not added</span>}</div>
+                <div className="col-span-1 sm:col-span-2"><span className="text-slate-500 font-bold uppercase text-[11px] block mb-1">Email</span>{profile.email}</div>
+              </div>
+            </div>
+
           </div>
         </div>
       </main>
 
       {/* ================= LIVE AUTO-SUGGEST MODAL ================= */}
-      {editing === 'skills' && (
+      {editing === 'keySkills' && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4 animate-in fade-in duration-200" onClick={() => setShowDropdown(false)}>
           <div className="bg-slate-800 rounded-2xl w-full max-w-2xl shadow-2xl flex flex-col border border-slate-700" onClick={e => e.stopPropagation()}>
-            
             <div className="flex justify-between items-start p-6 border-b border-slate-700/50">
               <div>
                 <h2 className="text-xl font-bold text-white">Key skills</h2>
@@ -439,10 +511,7 @@ export default function CandidateDashboardPage() {
                 </svg>
               </button>
             </div>
-
             <div className="p-6 space-y-6 min-h-[350px]">
-              
-              {/* 1. Added Pills Section */}
               <div>
                 <label className="text-sm font-bold text-white mb-3 block">Skills</label>
                 <div className="flex flex-wrap gap-2 mb-4">
@@ -458,8 +527,6 @@ export default function CandidateDashboardPage() {
                   ))}
                 </div>
               </div>
-
-              {/* 2. Standalone Live Input Box with Dropdown */}
               <div className="relative">
                 <input
                   type="text"
@@ -475,8 +542,6 @@ export default function CandidateDashboardPage() {
                   onBlur={() => setTimeout(() => setShowDropdown(false), 200)} 
                   className="w-full bg-slate-900 border border-slate-600 rounded-xl px-4 py-3 text-sm text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition-all"
                 />
-                
-                {/* The Floating Dropdown Menu */}
                 {showDropdown && newSkill.length >= 2 && (
                   <div className="absolute top-full left-0 w-full mt-2 bg-slate-900 border border-slate-700 rounded-xl shadow-2xl overflow-hidden z-50 max-h-[220px] overflow-y-auto">
                     {isFetchingSuggestions ? (
@@ -508,12 +573,10 @@ export default function CandidateDashboardPage() {
                 )}
               </div>
             </div>
-
             <div className="p-6 border-t border-slate-700/50 flex justify-end gap-4 bg-slate-800/50 rounded-b-2xl">
               <button onClick={() => setEditing(null)} className="text-blue-400 hover:text-blue-300 font-bold text-sm px-4 py-2 transition-colors">Cancel</button>
-              <button onClick={() => handleSave('skills')} className="bg-blue-600 hover:bg-blue-500 text-white font-bold text-sm py-2 px-6 rounded-full transition-colors shadow-md">Save</button>
+              <button onClick={() => handleSave('keySkills')} className="bg-blue-600 hover:bg-blue-500 text-white font-bold text-sm py-2 px-6 rounded-full transition-colors shadow-md">Save</button>
             </div>
-            
           </div>
         </div>
       )}

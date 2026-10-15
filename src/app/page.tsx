@@ -20,7 +20,7 @@ export default function HomePage() {
       <div className="max-w-[1400px] mx-auto p-6 md:p-8 relative z-10">
         
         {/* OUR REUSABLE NAVBAR! */}
-        <Navbar />
+        <div className="absolute top-0 left-0 w-full z-[200] px-6 py-6 md:px-8 pointer-events-auto"><Navbar /></div>
 
         {/* HERO SECTION */}
         <div className="flex flex-col items-center text-center mt-12 mb-20 max-w-4xl mx-auto">

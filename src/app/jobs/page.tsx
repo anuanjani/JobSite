@@ -115,7 +115,7 @@ export default function JobsPage() {
       <div className="max-w-[1400px] mx-auto p-6 md:p-8 relative z-10">
         
         {/* OUR CLEAN REUSABLE NAVBAR! */}
-        <Navbar />
+        <div className="absolute top-0 left-0 w-full z-[200] px-6 py-6 md:px-8 pointer-events-auto"><Navbar /></div>
 
         {/* PAGE HEADER & SMART SEARCH */}
         <div className="mb-10 max-w-5xl">
