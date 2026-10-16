@@ -9,6 +9,7 @@ export default function Navbar() {
   });
   const [showNotifications, setShowNotifications] = useState(false);
   const [showProfileDrawer, setShowProfileDrawer] = useState(false);
+  const [showEmployerDropdown, setShowEmployerDropdown] = useState(false);
   
   const navRef = useRef<HTMLDivElement>(null);
   const drawerRef = useRef<HTMLDivElement>(null);
@@ -206,10 +207,31 @@ export default function Navbar() {
                 </div>
               </>
             ) : (
-              /* LOGGED OUT */
+              /* LOGGED OUT with Hover-to-Reveal "For employers" dropdown */
               <div className="flex items-center gap-5 pl-5 border-l border-slate-700">
                 <Link href="/login" className="text-sm font-bold text-slate-300 hover:text-white transition-colors">Login</Link>
                 <Link href="/register" className="text-sm font-bold bg-blue-600 hover:bg-blue-500 text-white px-6 py-2.5 rounded-full shadow-md">Register</Link>
+                
+                <div 
+                  className="relative group py-2"
+                  onMouseEnter={() => setShowEmployerDropdown(true)}
+                  onMouseLeave={() => setShowEmployerDropdown(false)}
+                >
+                  <button className="text-sm font-bold text-slate-300 hover:text-white transition-colors flex items-center gap-1.5 cursor-pointer">
+                    For employers <span className="text-[10px]">▼</span>
+                  </button>
+
+                  {showEmployerDropdown && (
+                    <div className="absolute right-0 top-full w-52 bg-slate-800 border border-slate-700 rounded-2xl shadow-2xl z-[999999] overflow-hidden py-2 animate-in fade-in duration-150">
+                      <Link href="/register" className="block px-4 py-2.5 text-xs font-bold text-slate-300 hover:bg-slate-700 hover:text-white">
+                        Naukri Talent Cloud
+                      </Link>
+                      <Link href="/login" className="block px-4 py-2.5 text-xs font-bold text-slate-300 hover:bg-slate-700 hover:text-white">
+                        Employer Login
+                      </Link>
+                    </div>
+                  )}
+                </div>
               </div>
             )}
           </div>
