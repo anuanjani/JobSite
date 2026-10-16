@@ -6,14 +6,19 @@ import { useRouter } from 'next/navigation';
 export default function SettingsPage() {
   const router = useRouter();
   const [userName, setUserName] = useState('Loading...');
-  const [userInitials, setUserInitials] = useState('');
+  const [userRole, setUserRole] = useState('Candidate');
+  const [userAvatar, setUserAvatar] = useState('');
   const [userEmail, setUserEmail] = useState('');
-  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [showProfileDrawer, setShowProfileDrawer] = useState(false);
   const [activeTab, setActiveTab] = useState('Account');
   const [showManageDropdown, setShowManageDropdown] = useState(true);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
-  const dropdownRef = useRef<HTMLDivElement>(null);
+  
+  const navRef = useRef<HTMLDivElement>(null);
+  const drawerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const savedUser = localStorage.getItem('user');
@@ -21,17 +26,34 @@ export default function SettingsPage() {
       const parsed = JSON.parse(savedUser);
       setUserName(parsed.name);
       setUserEmail(parsed.email);
-      setUserInitials(parsed.name.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase());
+      setUserRole(parsed.role || 'CANDIDATE');
+
+      // Fetch live profile details (like avatar) from Neon
+      fetch(`/api/profile?email=${parsed.email}`)
+        .then(res => res.json())
+        .then(data => {
+          if (data.email) {
+            if (data.name) setUserName(data.name);
+            if (data.role) setUserRole(data.role);
+            if (data.avatar) setUserAvatar(data.avatar);
+          }
+        })
+        .catch(() => {});
     } else {
       router.push('/login');
     }
 
-    function handleClickOutside(event: MouseEvent) {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) setIsDropdownOpen(false);
-    }
+    const handleClickOutside = (event: MouseEvent) => {
+      if (navRef.current && !navRef.current.contains(event.target as Node)) {
+        setShowNotifications(false);
+      }
+      if (showProfileDrawer && drawerRef.current && !drawerRef.current.contains(event.target as Node)) {
+        setShowProfileDrawer(false);
+      }
+    };
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [router]);
+  }, [router, showProfileDrawer]);
 
   const handleLogout = () => {
     localStorage.removeItem('user');
@@ -67,44 +89,148 @@ export default function SettingsPage() {
       <div className="absolute top-[-10%] left-[-10%] w-[500px] h-[500px] bg-fuchsia-500/15 blur-[120px] rounded-full pointer-events-none fixed"></div>
       <div className="absolute bottom-[-10%] right-[-5%] w-[600px] h-[600px] bg-indigo-500/15 blur-[150px] rounded-full pointer-events-none fixed"></div>
 
-      <div className="max-w-[1400px] mx-auto p-6 md:p-8 relative z-10">
+      <div className="max-w-[1400px] mx-auto p-6 md:p-8 relative z-10" ref={navRef}>
         
-        {/* DYNAMIC NAVBAR */}
+        {/* CLEAN NAVBAR (Matches Dashboard & Jobs) */}
         <nav className="flex justify-between items-center mb-10 border-b border-slate-700/50 pb-6 relative z-50">
           <Link href="/" className="text-2xl font-extrabold tracking-tighter text-white">
             ROLEMATCH<span className="text-fuchsia-500">.</span>
           </Link>
           
-          <div className="flex gap-4 items-center">
-            <div className="hidden md:flex gap-8 text-sm font-bold tracking-wide text-slate-400 mr-8 uppercase">
-              <Link href="/candidate/dashboard" className="hover:text-white transition pb-1">Dashboard</Link>
-              <Link href="/jobs" className="hover:text-white transition pb-1">Jobs</Link>
-              <Link href="/messages" className="hover:text-white transition pb-1">Messages</Link>
-            </div>
-            
-            <button className="w-10 h-10 rounded-full bg-slate-800/50 border border-slate-700 flex items-center justify-center hover:bg-slate-700 transition backdrop-blur-md">
-              <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path></svg>
-            </button>
-            
-            {/* PROFILE DROPDOWN */}
-            <div className="relative" ref={dropdownRef}>
-              <button onClick={() => setIsDropdownOpen(!isDropdownOpen)} className="w-10 h-10 rounded-full bg-slate-900 border border-slate-600 flex items-center justify-center text-xs font-bold tracking-tighter hover:border-fuchsia-500 transition cursor-pointer">
-                {userInitials}
+          <div className="flex gap-6 items-center">
+            <Link href="/jobs" className="text-[13px] font-bold text-slate-300 hover:text-white transition-colors tracking-wide">
+              Jobs
+            </Link>
+
+            {/* NOTIFICATIONS BELL */}
+            <div className="relative">
+              <button 
+                onClick={() => { setShowNotifications(!showNotifications); setShowProfileDrawer(false); }} 
+                className="text-slate-400 hover:text-white relative p-2 cursor-pointer"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path></svg>
               </button>
-              {isDropdownOpen && (
-                <div className="absolute right-0 mt-3 w-64 bg-slate-800 border border-slate-600 rounded-2xl shadow-[0_10px_40px_rgba(0,0,0,0.5)] overflow-hidden z-50">
-                  <div className="p-4 border-b border-slate-700">
-                    <h3 className="font-bold text-white">{userName}</h3>
-                    <Link href="/candidate/dashboard" className="text-[10px] font-bold text-fuchsia-400 hover:text-fuchsia-300">View Profile</Link>
+
+              {showNotifications && (
+                <div className="absolute right-0 mt-3 w-80 sm:w-96 bg-slate-800 border border-slate-700 rounded-2xl shadow-2xl z-[999999] overflow-hidden">
+                  <div className="p-4 border-b border-slate-700/80 flex justify-between items-center bg-slate-800/50">
+                    <span className="font-bold text-white">Notifications</span>
                   </div>
-                  <div className="p-2 flex flex-col">
-                    <Link href="/candidate/dashboard" className="px-4 py-3 text-sm font-bold text-slate-300 hover:bg-slate-700 rounded-xl transition">Dashboard</Link>
-                    <Link href="/settings" className="px-4 py-3 text-sm font-bold text-slate-300 hover:bg-slate-700 rounded-xl transition">Settings</Link>
-                    <button onClick={handleLogout} className="px-4 py-3 text-sm font-bold text-red-400 hover:bg-red-500/10 rounded-xl transition text-left mt-1 border-t border-slate-700">Logout</button>
+                  <div className="max-h-[350px] overflow-y-auto">
+                    <div className="p-4 hover:bg-slate-700/30 transition-colors cursor-pointer">
+                      <p className="text-sm text-slate-300 leading-relaxed"><span className="text-blue-400 font-bold">Job Recommendations:</span> 12 new matches based on your profile.</p>
+                      <span className="text-xs text-slate-500 mt-2 block font-medium">Just now</span>
+                    </div>
                   </div>
                 </div>
               )}
             </div>
+
+            {/* PROFILE PILL (Opens Rich Slide-out Drawer) */}
+            <div className="relative">
+              <button 
+                onClick={() => { setShowProfileDrawer(true); setShowNotifications(false); }} 
+                className="flex items-center gap-2.5 bg-slate-800/80 border border-slate-600 p-1.5 pl-3.5 rounded-full shadow-sm hover:border-slate-400 transition-all cursor-pointer"
+              >
+                <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 6h16M4 12h16M4 18h16"></path></svg>
+                <div className="w-8 h-8 rounded-full overflow-hidden bg-slate-700 flex items-center justify-center">
+                  {userAvatar ? (
+                    <img src={userAvatar} alt="Profile" className="w-full h-full object-cover" />
+                  ) : (
+                    <span className="text-xs text-white font-bold">{userName?.charAt(0) || 'U'}</span>
+                  )}
+                </div>
+              </button>
+
+              {/* RICH PROFILE DRAWER */}
+              {showProfileDrawer && (
+                <div className="fixed inset-0 z-[9999999] flex justify-end bg-slate-950/70 backdrop-blur-sm pointer-events-auto">
+                  <div ref={drawerRef} className="w-full max-w-md h-full bg-slate-900 border-l border-slate-700/80 shadow-2xl flex flex-col justify-between overflow-y-auto">
+                    <div>
+                      <div className="p-6 border-b border-slate-800 flex justify-end items-center bg-slate-800/40 sticky top-0 z-10 backdrop-blur-md">
+                        <button onClick={() => setShowProfileDrawer(false)} className="w-9 h-9 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-slate-400 hover:text-white transition-colors cursor-pointer">
+                          ✕
+                        </button>
+                      </div>
+
+                      <div className="p-6 border-b border-slate-800 flex items-center gap-4 bg-slate-800/20">
+                        <div className="relative w-16 h-16 shrink-0 flex items-center justify-center">
+                          <svg className="absolute inset-0 w-full h-full -rotate-90 pointer-events-none" viewBox="0 0 64 64">
+                            <circle cx="32" cy="32" r="30" fill="none" stroke="#1e293b" strokeWidth="3" />
+                            <circle cx="32" cy="32" r="30" fill="none" stroke="#10b981" strokeWidth="3" strokeDasharray="188" strokeDashoffset="0" />
+                          </svg>
+                          <div className="w-13 h-13 rounded-full overflow-hidden bg-slate-800 flex items-center justify-center">
+                            {userAvatar ? <img src={userAvatar} alt="Avatar" className="w-full h-full object-cover" /> : <span className="text-lg text-white font-bold">{userName?.charAt(0) || 'U'}</span>}
+                          </div>
+                          <span className="absolute -bottom-1 bg-white text-emerald-600 text-[9px] font-extrabold px-2 py-0.2 rounded-full shadow">100%</span>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <h3 className="text-xl font-extrabold text-white truncate">{userName}</h3>
+                          <p className="text-sm font-bold text-slate-300 truncate mt-0.5">{userRole}</p>
+                          <Link href="/candidate/dashboard" onClick={() => setShowProfileDrawer(false)} className="text-xs font-bold text-blue-400 hover:text-blue-300 transition-colors mt-2 inline-block">
+                            View & Update Profile &rarr;
+                          </Link>
+                        </div>
+                      </div>
+
+                      {/* PRO UPGRADE BANNER */}
+                      <div className="mx-6 mt-6">
+                        <div className="p-4 bg-gradient-to-r from-amber-500/10 via-orange-500/10 to-amber-500/5 border border-amber-500/30 rounded-2xl flex items-center justify-between cursor-pointer hover:border-amber-500/60 transition-all group">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500 to-orange-500 flex items-center justify-center text-white shadow-md">👑</div>
+                            <div>
+                              <h4 className="text-sm font-extrabold text-white group-hover:text-amber-400 transition-colors">Upgrade to Rolematch Pro</h4>
+                              <p className="text-[11px] text-slate-400">Get highlighted to top recruiters</p>
+                            </div>
+                          </div>
+                          <svg className="w-5 h-5 text-slate-400 group-hover:text-amber-400 group-hover:translate-x-1 transition-all" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 5l7 7-7 7"></path></svg>
+                        </div>
+                      </div>
+
+                      {/* PERFORMANCE */}
+                      <div className="mx-6 mt-6 mb-6 p-5 bg-slate-800/60 border border-slate-700/80 rounded-2xl">
+                        <div className="flex justify-between items-center mb-4">
+                          <span className="text-xs font-bold text-slate-300 uppercase tracking-wider">Your profile performance</span>
+                          <span className="text-[10px] text-slate-500 font-medium bg-slate-900 px-2 py-0.5 rounded">Last 90 days</span>
+                        </div>
+                        <div className="grid grid-cols-2 gap-4 text-center">
+                          <div className="bg-slate-900/60 p-3.5 rounded-xl border border-slate-700/50 relative">
+                            <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-red-500"></span>
+                            <div className="text-xl font-extrabold text-white">871</div>
+                            <div className="text-[11px] text-slate-400 mt-0.5">Search Appearances</div>
+                          </div>
+                          <div className="bg-slate-900/60 p-3.5 rounded-xl border border-slate-700/50 relative">
+                            <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-red-500"></span>
+                            <div className="text-xl font-extrabold text-white">50</div>
+                            <div className="text-[11px] text-slate-400 mt-0.5">Recruiter Actions</div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* DRAWER MENU LINKS */}
+                      <div className="mx-6 space-y-2 mb-6">
+                        <Link href="/candidate/dashboard" onClick={() => setShowProfileDrawer(false)} className="flex items-center gap-4 px-4 py-3 rounded-xl bg-slate-800/40 hover:bg-slate-800 border border-slate-700/50 text-slate-200 font-bold text-sm transition-colors">
+                          📊 Dashboard
+                        </Link>
+                        <Link href="/settings" onClick={() => setShowProfileDrawer(false)} className="flex items-center gap-4 px-4 py-3 rounded-xl bg-slate-800/40 hover:bg-slate-800 border border-slate-700/50 text-slate-200 font-bold text-sm transition-colors">
+                          ⚙️ Settings
+                        </Link>
+                        <Link href="/faqs" onClick={() => setShowProfileDrawer(false)} className="flex items-center gap-4 px-4 py-3 rounded-xl bg-slate-800/40 hover:bg-slate-800 border border-slate-700/50 text-slate-200 font-bold text-sm transition-colors">
+                          ❓ FAQs
+                        </Link>
+                      </div>
+                    </div>
+
+                    <div className="p-6 border-t border-slate-800 bg-slate-900/80 sticky bottom-0">
+                      <button onClick={handleLogout} className="w-full flex items-center justify-center gap-3 py-3.5 rounded-xl text-sm text-red-400 hover:text-white hover:bg-red-500/20 transition-colors font-bold border border-red-500/30 cursor-pointer">
+                        🚪 Logout
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
           </div>
         </nav>
 
@@ -151,34 +277,11 @@ export default function SettingsPage() {
                       </div>
                       <button className="text-sm font-bold text-fuchsia-400 hover:text-fuchsia-300 transition">Customize</button>
                     </div>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
-                      <div className="space-y-3">
-                         <p className="text-sm text-slate-300 flex items-center gap-2"><span className="text-emerald-500">✓</span> Job recommendations</p>
-                         <p className="text-sm text-slate-300 flex items-center gap-2"><span className="text-emerald-500">✓</span> Job status updates</p>
-                         <p className="text-sm text-slate-300 flex items-center gap-2"><span className="text-emerald-500">✓</span> Promotional mails</p>
-                      </div>
-                      <div className="space-y-3">
-                         <p className="text-sm text-slate-300 flex items-center gap-2"><span className="text-emerald-500">✓</span> Jobs & messages from recruiters</p>
-                         <p className="text-sm text-slate-300 flex items-center gap-2"><span className="text-emerald-500">✓</span> Who viewed my profile</p>
-                         <p className="text-sm text-slate-300 flex items-center gap-2"><span className="text-emerald-500">✓</span> Profile visible to all recruiters</p>
-                      </div>
-                    </div>
                   </div>
                   <div className="bg-fuchsia-600 px-6 py-3 flex items-center gap-3">
                      <div className="w-4 h-4 rounded-full bg-white border-4 border-fuchsia-600 ring-2 ring-white"></div>
                      <span className="text-white font-bold text-sm">Selected</span>
                   </div>
-                </div>
-
-                <div className="rounded-xl border border-slate-700 bg-slate-900/50 p-6 hover:border-slate-500 transition cursor-pointer">
-                    <div className="flex justify-between items-start mb-4">
-                      <div>
-                        <h3 className="text-lg font-bold text-white mb-1">Not actively looking but open for opportunities</h3>
-                        <p className="text-sm text-slate-400">Recommended for candidates who are not looking for job opportunities right now but open to occasionally receiving relevant job opportunities.</p>
-                      </div>
-                      <button className="text-sm font-bold text-fuchsia-400 hover:text-fuchsia-300 transition">Customize</button>
-                    </div>
                 </div>
               </div>
             )}
@@ -206,7 +309,7 @@ export default function SettingsPage() {
                       </div>
                       <button 
                         onClick={() => setShowDeleteModal(true)}
-                        className="bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 px-5 py-2.5 rounded-xl font-bold text-xs transition-colors shrink-0"
+                        className="bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 px-5 py-2.5 rounded-xl font-bold text-xs transition-colors shrink-0 cursor-pointer"
                       >
                         Delete Account
                       </button>
@@ -246,14 +349,14 @@ export default function SettingsPage() {
               <button 
                 onClick={() => setShowDeleteModal(false)}
                 disabled={isDeleting}
-                className="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold py-3 rounded-xl text-sm transition-colors"
+                className="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold py-3 rounded-xl text-sm transition-colors cursor-pointer"
               >
                 Cancel
               </button>
               <button 
                 onClick={handleDeleteAccount}
                 disabled={isDeleting}
-                className="flex-1 bg-red-600 hover:bg-red-500 disabled:bg-slate-800 text-white font-bold py-3 rounded-xl text-sm transition-colors shadow-lg shadow-red-600/30"
+                className="flex-1 bg-red-600 hover:bg-red-500 disabled:bg-slate-800 text-white font-bold py-3 rounded-xl text-sm transition-colors shadow-lg shadow-red-600/30 cursor-pointer"
               >
                 {isDeleting ? 'Deleting...' : 'Yes, Delete'}
               </button>

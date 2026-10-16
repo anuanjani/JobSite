@@ -11,11 +11,22 @@ export default function RegisterPage() {
   });
   const [status, setStatus] = useState('idle');
   const [error, setError] = useState('');
+  const [isPasswordFocused, setIsPasswordFocused] = useState(false);
+
+  // Enterprise Password Validation Regex: Minimum length 8, at least 1 uppercase, 1 lowercase, 1 number, 1 special char
+  const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{8,}$/;
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
-    setStatus('loading');
     setError('');
+
+    // Validate password complexity before submitting
+    if (!passwordRegex.test(formData.password)) {
+      setError('Password must be at least 8 characters long and contain at least one uppercase letter, one lowercase letter, one number, and one special character.');
+      return;
+    }
+
+    setStatus('loading');
 
     try {
       await new Promise((resolve) => setTimeout(resolve, 1500));
@@ -68,7 +79,7 @@ export default function RegisterPage() {
 
       <div className="group w-full max-w-5xl rounded-[2rem] bg-slate-800/40 backdrop-blur-xl border border-slate-700/50 flex flex-col md:flex-row overflow-hidden relative z-10 shadow-2xl">
         
-        {/* Top Right Close Button (Hover to Reveal) */}
+        {/* Top Right Close Button */}
         <Link href="/" className="absolute top-6 right-6 md:top-8 md:right-8 w-10 h-10 rounded-full bg-slate-900 border border-slate-700 flex items-center justify-center hover:bg-slate-700 hover:text-fuchsia-400 transition-all duration-300 opacity-0 group-hover:opacity-100 text-slate-400 z-50 shadow-[0_0_15px_rgba(0,0,0,0.5)]">
           <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"></path></svg>
         </Link>
@@ -147,19 +158,43 @@ export default function RegisterPage() {
               />
             </div>
 
-            <div>
+            <div className="relative">
               <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Password *</label>
               <input 
                 type="password" 
                 required 
-                minLength={6} 
-                placeholder="Minimum 6 characters"
+                placeholder="Create a strong password"
+                value={formData.password}
+                onFocus={() => setIsPasswordFocused(true)}
+                onBlur={() => setIsPasswordFocused(false)}
                 onChange={(e) => setFormData({...formData, password: e.target.value})} 
                 className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-fuchsia-500 transition-colors" 
               />
+              
+              {/* Auto-suggest / Helper Tooltip on Focus */}
+              {isPasswordFocused && (
+                <div className="absolute left-0 top-[calc(100%+6px)] w-full bg-slate-950 border border-slate-700 p-3.5 rounded-xl shadow-xl z-50 text-xs text-slate-300 space-y-1.5 animate-in fade-in duration-200">
+                  <p className="font-bold text-white">Password requirements:</p>
+                  <p className={`flex items-center gap-2 ${/[A-Z]/.test(formData.password) ? 'text-emerald-400' : 'text-slate-400'}`}>
+                    <span>{/[A-Z]/.test(formData.password) ? '✓' : '•'}</span> At least one uppercase letter (A-Z)
+                  </p>
+                  <p className={`flex items-center gap-2 ${/[a-z]/.test(formData.password) ? 'text-emerald-400' : 'text-slate-400'}`}>
+                    <span>{/[a-z]/.test(formData.password) ? '✓' : '•'}</span> At least one lowercase letter (a-z)
+                  </p>
+                  <p className={`flex items-center gap-2 ${/\d/.test(formData.password) ? 'text-emerald-400' : 'text-slate-400'}`}>
+                    <span>{/\d/.test(formData.password) ? '✓' : '•'}</span> At least one number (0-9)
+                  </p>
+                  <p className={`flex items-center gap-2 ${/[\W_]/.test(formData.password) ? 'text-emerald-400' : 'text-slate-400'}`}>
+                    <span>{/[\W_]/.test(formData.password) ? '✓' : '•'}</span> At least one special character (!@#$%^&*)
+                  </p>
+                  <p className={`flex items-center gap-2 ${formData.password.length >= 8 ? 'text-emerald-400' : 'text-slate-400'}`}>
+                    <span>{formData.password.length >= 8 ? '✓' : '•'}</span> Minimum 8 characters
+                  </p>
+                </div>
+              )}
             </div>
 
-            <div>
+            <div className="pt-2">
               <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Mobile Number *</label>
               <div className="flex bg-slate-900 border border-slate-700 rounded-xl overflow-hidden focus-within:border-fuchsia-500 transition-colors">
                 <div className="bg-slate-800 px-4 py-3 text-sm font-bold text-slate-400 border-r border-slate-700 flex items-center justify-center">+91</div>
