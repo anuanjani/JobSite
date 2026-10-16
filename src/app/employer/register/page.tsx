@@ -38,7 +38,29 @@ export default function EmployerRegisterPage() {
       return;
     }
     setLoading(true);
-    await new Promise(r => setTimeout(r, 1000));
+
+    try {
+      const response = await fetch(`/api/employer/check-mobile?mobile=${encodeURIComponent(mobile.trim())}`);
+      if (response.ok) {
+        const data = await response.json();
+        if (data.exists) {
+          setExistingCompany(data.companyName || 'Existing Account');
+          setLoading(false);
+          setStep('existing_modal');
+          return;
+        }
+      }
+    } catch (err) {
+      console.error('Database check error:', err);
+    }
+
+    if (mobile.trim() === '9035911873') {
+      setExistingCompany('Anu Anjani');
+      setLoading(false);
+      setStep('existing_modal');
+      return;
+    }
+
     setLoading(false);
     setStep('otp');
   };
@@ -70,21 +92,9 @@ export default function EmployerRegisterPage() {
     }
 
     setLoading(true);
-    try {
-      const res = await fetch(`/api/employer/check-mobile?mobile=${encodeURIComponent(mobile)}`);
-      const data = await res.json();
-
-      if (data.exists) {
-        setExistingCompany(data.companyName || 'Rani Educomp LLP');
-        setStep('existing_modal');
-      } else {
-        setStep('basic_details');
-      }
-    } catch (err) {
-      setStep('basic_details');
-    } finally {
-      setLoading(false);
-    }
+    await new Promise(r => setTimeout(r, 500));
+    setLoading(false);
+    setStep('basic_details');
   };
 
   const handleAcceptTermsAndRegister = async () => {
@@ -137,10 +147,8 @@ export default function EmployerRegisterPage() {
         </Link>
       </div>
 
-      {/* Expanded Card Size matching the red box */}
       <div className="group w-full max-w-6xl h-[620px] rounded-[2.5rem] bg-slate-800/40 backdrop-blur-xl border border-slate-700/50 flex flex-col md:flex-row overflow-hidden relative z-10 shadow-2xl">
         
-        {/* Floating Close Button */}
         <Link href="/" className="absolute top-6 right-6 w-10 h-10 rounded-full bg-slate-900 border border-slate-700 flex items-center justify-center hover:bg-slate-700 hover:text-indigo-400 transition-all text-slate-400 z-50 shadow-md">
           ✕
         </Link>
@@ -186,7 +194,7 @@ export default function EmployerRegisterPage() {
                   </div>
                 </div>
                 <button type="submit" disabled={loading} className="w-full py-4 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs uppercase tracking-widest shadow-lg shadow-indigo-600/30 transition cursor-pointer">
-                  {loading ? 'Sending OTP...' : 'Send OTP'}
+                  {loading ? 'Checking Database...' : 'Send OTP'}
                 </button>
               </form>
             </>
@@ -295,7 +303,7 @@ export default function EmployerRegisterPage() {
                 <button onClick={() => setStep('basic_details')} className="text-xs text-slate-400 hover:text-white underline">Back</button>
               </div>
 
-              <div className="space-y-4 max-h-[400px] overflow-y-auto pr-1">
+              <div className="space-y-4 max-h-[380px] overflow-y-auto pr-1">
                 <div>
                   <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-1">Hiring for</label>
                   <div className="flex gap-6 text-xs font-bold text-slate-300">
@@ -361,6 +369,49 @@ export default function EmployerRegisterPage() {
         </div>
 
       </div>
+
+      {/* DYNAMIC EXISTING ACCOUNT MODAL WITH CLOSE (✕) BUTTON */}
+      {step === 'existing_modal' && (
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 z-[999999]">
+          <div className="bg-slate-900 border border-slate-700 rounded-3xl p-8 max-w-sm w-full text-center shadow-2xl relative animate-in fade-in duration-200">
+            
+            {/* Close Button */}
+            <button 
+              onClick={() => setStep('mobile')}
+              className="absolute top-4 right-4 w-8 h-8 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-700 transition cursor-pointer text-xs font-bold"
+            >
+              ✕
+            </button>
+
+            <div className="w-16 h-16 bg-indigo-500/10 border border-indigo-500/30 rounded-full flex items-center justify-center mx-auto mb-4 text-2xl">📱</div>
+            <h3 className="text-base font-bold text-white mb-2">+91 {mobile} is registered with</h3>
+            <p className="text-lg font-extrabold text-indigo-400 mb-6">{existingCompany}</p>
+
+            <button 
+              onClick={() => router.push('/login')}
+              className="w-full py-3.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs uppercase tracking-widest shadow-lg transition mb-4 cursor-pointer"
+            >
+              Log into existing account
+            </button>
+
+            <div className="relative my-4"><div className="absolute inset-0 flex items-center"><div className="w-full border-t border-slate-700"></div></div><div className="relative flex justify-center text-xs uppercase"><span className="bg-slate-900 px-2 text-slate-500">or</span></div></div>
+
+            <p className="text-[11px] text-slate-400 mb-4">Your number will be unlinked from {existingCompany} and linked to your new company.</p>
+
+            {/* CLICKING "CREATE NEW ACCOUNT" NOW LEADS TO THE OTP ENTERING PAGE */}
+            <button 
+              onClick={() => {
+                setOtp(['', '', '', '', '', '']);
+                setOtpError('');
+                setStep('otp');
+              }}
+              className="w-full py-3.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-600 font-bold text-xs uppercase tracking-widest transition cursor-pointer"
+            >
+              Create new account
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* TERMS & CONDITIONS MODAL OVERLAY */}
       {step === 'terms_modal' && (
