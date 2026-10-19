@@ -12,9 +12,12 @@ export default function RegisterPage() {
   const [error, setError] = useState('');
   const [isPasswordFocused, setIsPasswordFocused] = useState(false);
 
-  // Validation States
+  // Validation & DB Check States
   const [emailVerified, setEmailVerified] = useState(false);
   const [mobileVerified, setMobileVerified] = useState(false);
+  const [checkingField, setCheckingField] = useState<'email' | 'mobile' | null>(null);
+  const [emailError, setEmailError] = useState('');
+  const [mobileError, setMobileError] = useState('');
   
   // Modal PIN states & refs
   const [activeModal, setActiveModal] = useState<'email' | 'mobile' | null>(null);
@@ -30,15 +33,68 @@ export default function RegisterPage() {
 
   const isFormValid = isNameValid && isPasswordValid && emailVerified && mobileVerified;
 
-  const handleOpenValidate = (type: 'email' | 'mobile') => {
-    if (type === 'email' && !emailRegex.test(formData.email)) {
-      alert('Please enter a valid email address first.');
-      return;
+  const handleOpenValidate = async (type: 'email' | 'mobile') => {
+    setError('');
+
+    if (type === 'email') {
+      setEmailError('');
+      if (!emailRegex.test(formData.email.trim())) {
+        setEmailError('Please enter a valid email address first.');
+        return;
+      }
+
+      setCheckingField('email');
+      try {
+        const res = await fetch('/api/register/check', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: formData.email.trim() }),
+        });
+        const data = await res.json();
+
+        if (!res.ok || data.exists) {
+          setEmailError(data.error || 'This Email ID is already registered.');
+          setCheckingField(null);
+          return;
+        }
+      } catch {
+        setEmailError('Unable to verify email right now. Please try again.');
+        setCheckingField(null);
+        return;
+      }
+      setCheckingField(null);
     }
-    if (type === 'mobile' && formData.mobile.length < 10) {
-      alert('Please enter a valid 10-digit mobile number first.');
-      return;
+
+    if (type === 'mobile') {
+      setMobileError('');
+      const cleanMobile = formData.mobile.replace(/\D/g, '');
+      if (cleanMobile.length !== 10) {
+        setMobileError('Please enter a valid 10-digit mobile number first.');
+        return;
+      }
+
+      setCheckingField('mobile');
+      try {
+        const res = await fetch('/api/register/check', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ mobile: cleanMobile }),
+        });
+        const data = await res.json();
+
+        if (!res.ok || data.exists) {
+          setMobileError(data.error || 'This mobile number is already registered.');
+          setCheckingField(null);
+          return;
+        }
+      } catch {
+        setMobileError('Unable to verify mobile number right now. Please try again.');
+        setCheckingField(null);
+        return;
+      }
+      setCheckingField(null);
     }
+
     setPin(['', '', '', '', '', '']);
     setPinError('');
     setActiveModal(type);
@@ -71,8 +127,10 @@ export default function RegisterPage() {
 
     if (activeModal === 'email') {
       setEmailVerified(true);
+      setEmailError('');
     } else if (activeModal === 'mobile') {
       setMobileVerified(true);
+      setMobileError('');
     }
     setActiveModal(null);
   };
@@ -94,10 +152,10 @@ export default function RegisterPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          name: formData.name,
-          email: formData.email,
+          name: formData.name.trim(),
+          email: formData.email.toLowerCase().trim(),
           password: formData.password,
-          mobileNumber: formData.mobile,
+          mobileNumber: formData.mobile.replace(/\D/g, ''),
           workStatus: formData.workStatus,
           role: 'CANDIDATE'
         }),
@@ -142,19 +200,19 @@ export default function RegisterPage() {
         
         {/* Left Info Panel */}
         <div className="w-full md:w-5/12 bg-slate-900/50 p-10 lg:p-12 flex flex-col border-r border-slate-700/50 justify-between">
-            <div>
-              <div className="w-24 h-24 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-4xl mb-10 shadow-inner">
-                🚀
-              </div>
-              <h2 className="text-3xl font-extrabold tracking-tighter text-white mb-8">
-                On registering, you can
-              </h2>
-              <div className="space-y-6">
-                <div className="flex items-start gap-4"><svg className="w-5 h-5 text-emerald-400 mt-0.5 shrink-0" fill="none" stroke="currentColor" strokeWidth="3" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"></path></svg><p className="text-sm font-medium text-slate-300">Build your profile and let top recruiters find you instantly</p></div>
-                <div className="flex items-start gap-4"><svg className="w-5 h-5 text-emerald-400 mt-0.5 shrink-0" fill="none" stroke="currentColor" strokeWidth="3" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"></path></svg><p className="text-sm font-medium text-slate-300">Get premium job postings delivered right to your email</p></div>
-                <div className="flex items-start gap-4"><svg className="w-5 h-5 text-emerald-400 mt-0.5 shrink-0" fill="none" stroke="currentColor" strokeWidth="3" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"></path></svg><p className="text-sm font-medium text-slate-300">Find a job and accelerate your career trajectory</p></div>
-              </div>
+          <div>
+            <div className="w-24 h-24 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-4xl mb-10 shadow-inner">
+              🚀
             </div>
+            <h2 className="text-3xl font-extrabold tracking-tighter text-white mb-8">
+              On registering, you can
+            </h2>
+            <div className="space-y-6">
+              <div className="flex items-start gap-4"><svg className="w-5 h-5 text-emerald-400 mt-0.5 shrink-0" fill="none" stroke="currentColor" strokeWidth="3" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"></path></svg><p className="text-sm font-medium text-slate-300">Build your profile and let top recruiters find you instantly</p></div>
+              <div className="flex items-start gap-4"><svg className="w-5 h-5 text-emerald-400 mt-0.5 shrink-0" fill="none" stroke="currentColor" strokeWidth="3" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"></path></svg><p className="text-sm font-medium text-slate-300">Get premium job postings delivered right to your email</p></div>
+              <div className="flex items-start gap-4"><svg className="w-5 h-5 text-emerald-400 mt-0.5 shrink-0" fill="none" stroke="currentColor" strokeWidth="3" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"></path></svg><p className="text-sm font-medium text-slate-300">Find a job and accelerate your career trajectory</p></div>
+            </div>
+          </div>
         </div>
 
         {/* Right Form Panel */}
@@ -176,7 +234,7 @@ export default function RegisterPage() {
               />
             </div>
 
-            {/* Email with Validate Button */}
+            {/* Email with Validate Button & DB Duplicate Check */}
             <div>
               <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Email ID *</label>
               <div className="flex gap-2">
@@ -186,21 +244,30 @@ export default function RegisterPage() {
                   placeholder="name@example.com"
                   value={formData.email}
                   disabled={emailVerified}
-                  onChange={(e) => setFormData({...formData, email: e.target.value})} 
-                  className="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-fuchsia-500 disabled:opacity-50" 
+                  onChange={(e) => {
+                    setFormData({...formData, email: e.target.value});
+                    setEmailError('');
+                  }} 
+                  className={`flex-1 bg-slate-900 border rounded-xl px-4 py-3 text-sm text-white outline-none transition-colors disabled:opacity-50 ${
+                    emailError ? 'border-red-500 focus:border-red-500' : 'border-slate-700 focus:border-fuchsia-500'
+                  }`} 
                 />
                 {emailVerified ? (
                   <span className="bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-4 py-3 rounded-xl text-xs font-bold flex items-center gap-1">✓ Verified</span>
                 ) : (
                   <button 
                     type="button" 
+                    disabled={checkingField === 'email'}
                     onClick={() => handleOpenValidate('email')}
-                    className="bg-fuchsia-600 hover:bg-fuchsia-500 text-white px-5 py-3 rounded-xl text-xs font-bold tracking-wider uppercase transition cursor-pointer shrink-0"
+                    className="bg-fuchsia-600 hover:bg-fuchsia-500 disabled:bg-fuchsia-600/50 text-white px-5 py-3 rounded-xl text-xs font-bold tracking-wider uppercase transition cursor-pointer shrink-0"
                   >
-                    Validate
+                    {checkingField === 'email' ? 'Checking...' : 'Validate'}
                   </button>
                 )}
               </div>
+              {emailError && (
+                <p className="text-red-400 text-xs font-bold mt-2">{emailError}</p>
+              )}
             </div>
 
             <div className="relative">
@@ -228,19 +295,26 @@ export default function RegisterPage() {
               )}
             </div>
 
-            {/* Mobile Number with Validate Button */}
+            {/* Mobile Number with Validate Button & DB Duplicate Check */}
             <div className="pt-2">
               <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Mobile Number *</label>
               <div className="flex gap-2">
-                <div className="flex-1 flex bg-slate-900 border border-slate-700 rounded-xl overflow-hidden focus-within:border-fuchsia-500">
+                <div className={`flex-1 flex bg-slate-900 border rounded-xl overflow-hidden transition-colors ${
+                  mobileError ? 'border-red-500 focus-within:border-red-500' : 'border-slate-700 focus-within:border-fuchsia-500'
+                }`}>
                   <div className="bg-slate-800 px-4 py-3 text-sm font-bold text-slate-400 border-r border-slate-700 flex items-center justify-center">+91</div>
                   <input 
                     type="tel" 
                     required 
+                    maxLength={10}
                     disabled={mobileVerified}
-                    placeholder="Enter mobile number"
+                    placeholder="Enter 10-digit mobile number"
                     value={formData.mobile}
-                    onChange={(e) => setFormData({...formData, mobile: e.target.value})} 
+                    onChange={(e) => {
+                      const digits = e.target.value.replace(/\D/g, '').slice(0, 10);
+                      setFormData({...formData, mobile: digits});
+                      setMobileError('');
+                    }} 
                     className="flex-1 bg-transparent px-4 py-3 text-sm text-white outline-none disabled:opacity-50" 
                   />
                 </div>
@@ -249,13 +323,17 @@ export default function RegisterPage() {
                 ) : (
                   <button 
                     type="button" 
+                    disabled={checkingField === 'mobile'}
                     onClick={() => handleOpenValidate('mobile')}
-                    className="bg-fuchsia-600 hover:bg-fuchsia-500 text-white px-5 py-3 rounded-xl text-xs font-bold tracking-wider uppercase transition cursor-pointer shrink-0"
+                    className="bg-fuchsia-600 hover:bg-fuchsia-500 disabled:bg-fuchsia-600/50 text-white px-5 py-3 rounded-xl text-xs font-bold tracking-wider uppercase transition cursor-pointer shrink-0"
                   >
-                    Validate
+                    {checkingField === 'mobile' ? 'Checking...' : 'Validate'}
                   </button>
                 )}
               </div>
+              {mobileError && (
+                <p className="text-red-400 text-xs font-bold mt-2">{mobileError}</p>
+              )}
             </div>
 
             <div className="pt-2">
