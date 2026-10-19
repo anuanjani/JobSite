@@ -42,13 +42,13 @@ export default function EmployerDashboardPage() {
         return;
       }
 
-      // Check cached KYC status first so banner never flashes if already approved
+      // Check cached KYC status for instant UI response before DB fetch completes
       const cachedKyc = localStorage.getItem(`kyc_status_${email.toLowerCase()}`);
       if (cachedKyc === 'APPROVED') {
         setKycStatus('APPROVED');
       }
 
-      // Fetch profile name and live KYC status from Neon DB
+      // Fetch profile name and live KYC status from Neon DB (Source of Truth)
       fetch(`/api/employer/company-profile?email=${encodeURIComponent(email)}`)
         .then((res) => res.json())
         .then((data) => {
@@ -58,8 +58,10 @@ export default function EmployerDashboardPage() {
           if (data?.kycStatus?.toUpperCase() === 'APPROVED') {
             setKycStatus('APPROVED');
             localStorage.setItem(`kyc_status_${email.toLowerCase()}`, 'APPROVED');
-          } else if (cachedKyc !== 'APPROVED') {
+          } else {
+            // Database is the source of truth: if PENDING (e.g., deleted & re-registered user), clear stale cache
             setKycStatus('PENDING');
+            localStorage.removeItem(`kyc_status_${email.toLowerCase()}`);
           }
         })
         .catch(() => {
@@ -72,7 +74,7 @@ export default function EmployerDashboardPage() {
     }
   }, []);
 
-  // Read file as Base64 Data URL so it can be stored in the database
+  // Read file as Base64 Data URL so it can be uploaded to UploadThing & stored in Neon DB
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFileError('');
     if (e.target.files && e.target.files[0]) {
@@ -579,7 +581,7 @@ export default function EmployerDashboardPage() {
                     </select>
                   </div>
 
-                  {/* Uploaded Files List (with green bottom progress bar + trash icon) */}
+                  {/* Uploaded Files List */}
                   {uploadedFileName && (
                     <div className="max-w-sm">
                       <label className="block text-xs font-bold text-slate-400 mb-1.5">
