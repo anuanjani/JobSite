@@ -1,62 +1,209 @@
 import { NextResponse } from 'next/server';
-import { pool } from '../../../utils/db';
+import { neon } from '@neondatabase/serverless';
 
-export async function GET(req: Request) {
+async function ensureJobsColumns(sql: any) {
+  await sql`
+    CREATE TABLE IF NOT EXISTS jobs (
+      id SERIAL PRIMARY KEY,
+      employer_id INTEGER,
+      title VARCHAR(255) NOT NULL,
+      company_name VARCHAR(255),
+      location VARCHAR(255),
+      work_mode VARCHAR(100),
+      salary VARCHAR(100),
+      experience VARCHAR(100),
+      openings INTEGER DEFAULT 1,
+      posted_date VARCHAR(50),
+      notice_period VARCHAR(100),
+      skills TEXT,
+      description TEXT,
+      status VARCHAR(50) DEFAULT 'ACTIVE',
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+  `;
+
   try {
-    const { searchParams } = new URL(req.url);
-    const search = searchParams.get('search') || '';
-    const location = searchParams.get('location') || '';
-    const workMode = searchParams.get('workMode') || '';
-
-    let query = `
-      -j.id, j.title, jp.company_name as company, j.location, j.work_mode as type, 
-      j.salary_range as salary, j.tags, j.created_at
-      FROM jobs j
-      JOIN employer_profiles jp ON j.employer_id = jp.user_id
-      WHERE 1=1
+    await sql`
+      ALTER TABLE jobs DROP CONSTRAINT IF EXISTS jobs_employer_id_fkey
     `;
-    const params: any[] = [];
-    let paramIndex = 1;
+  } catch {}
 
-    if (search) {
-      query += ` AND (LOWER(j.title) LIKE $${paramIndex} OR LOWER(jp.company_name) LIKE $${paramIndex})`;
-      params.push(`%${search.toLowerCase()}%`);
-      paramIndex++;
+  await sql`
+    ALTER TABLE jobs
+      ADD COLUMN IF NOT EXISTS employer_id INTEGER,
+      ADD COLUMN IF NOT EXISTS company_name VARCHAR(255),
+      ADD COLUMN IF NOT EXISTS location VARCHAR(255),
+      ADD COLUMN IF NOT EXISTS work_mode VARCHAR(100),
+      ADD COLUMN IF NOT EXISTS salary VARCHAR(100),
+      ADD COLUMN IF NOT EXISTS experience VARCHAR(100),
+      ADD COLUMN IF NOT EXISTS openings INTEGER DEFAULT 1,
+      ADD COLUMN IF NOT EXISTS posted_date VARCHAR(50),
+      ADD COLUMN IF NOT EXISTS notice_period VARCHAR(100),
+      ADD COLUMN IF NOT EXISTS skills TEXT,
+      ADD COLUMN IF NOT EXISTS description TEXT,
+      ADD COLUMN IF NOT EXISTS employer_email VARCHAR(255),
+      ADD COLUMN IF NOT EXISTS status VARCHAR(50) DEFAULT 'ACTIVE'
+  `;
+}
+
+export async function GET(request: Request) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const employerEmail = searchParams.get('employerEmail');
+
+    const sql = neon(process.env.DATABASE_URL!);
+    await ensureJobsColumns(sql);
+
+    if (employerEmail) {
+      const rows = await sql`
+        SELECT * FROM jobs
+        WHERE LOWER(TRIM(COALESCE(employer_email, ''))) = LOWER(TRIM(${employerEmail}))
+        ORDER BY id DESC
+      `;
+      return NextResponse.json({ jobs: rows });
     }
 
-    if (location) {
-      query += ` AND LOWER(j.location) LIKE $${paramIndex}`;
-      params.push(`%${location.toLowerCase()}%`);
-      paramIndex++;
+    const rows = await sql`
+      SELECT * FROM jobs ORDER BY id DESC
+    `;
+
+    return NextResponse.json({ jobs: rows });
+  } catch (error: any) {
+    console.error('GET /api/jobs error:', error);
+    return NextResponse.json(
+      { error: 'Failed to load jobs', jobs: [] },
+      { status: 500 }
+    );
+  }
+}
+
+export async function POST(request: Request) {
+  try {
+    const body = await request.json();
+    const {
+      title,
+      workMode,
+      location,
+      salary,
+      experience,
+      openings,
+      postedDate,
+      noticePeriod,
+      skills,
+      description,
+      employerEmail,
+      companyName,
+    } = body;
+
+    if (!title || !experience || !noticePeriod || !description) {
+      return NextResponse.json(
+        {
+          error:
+            'Job Title, Experience, Notice Period, and Job Description are mandatory.',
+        },
+        { status: 400 }
+      );
     }
 
-    if (workMode) {
-      query += ` AND LOWER(j.work_mode) = LOWER($${paramIndex})`;
-      params.push(workMode);
-      paramIndex++;
+    const sql = neon(process.env.DATABASE_URL!);
+    await ensureJobsColumns(sql);
+
+    let employerId: number | null = null;
+    let resolvedCompany = companyName || 'Company';
+
+    if (employerEmail) {
+      const users = await sql`
+        SELECT id FROM users WHERE LOWER(TRIM(email)) = LOWER(TRIM(${employerEmail})) LIMIT 1
+      `;
+      if (users.length > 0) {
+        employerId = users[0].id;
+        try {
+          const emp = await sql`
+            SELECT company_name, full_name FROM employer_profiles WHERE user_id = ${employerId} LIMIT 1
+          `;
+          if (emp.length > 0) {
+            resolvedCompany =
+              emp[0].company_name || emp[0].full_name || resolvedCompany;
+          }
+        } catch {}
+      }
     }
 
-    query += ` ORDER BY j.created_at DESC`;
+    const inserted = await sql`
+      INSERT INTO jobs (
+        employer_id,
+        employer_email,
+        title,
+        company_name,
+        location,
+        work_mode,
+        salary,
+        experience,
+        openings,
+        posted_date,
+        notice_period,
+        skills,
+        description,
+        status
+      ) VALUES (
+        ${employerId},
+        ${employerEmail || ''},
+        ${title},
+        ${resolvedCompany},
+        ${location || ''},
+        ${workMode || 'Hybrid'},
+        ${salary || ''},
+        ${experience},
+        ${Number(openings) || 1},
+        ${postedDate || ''},
+        ${noticePeriod},
+        ${skills || ''},
+        ${description},
+        'ACTIVE'
+      )
+      RETURNING *
+    `;
 
-    const result = await pool.query(query, params);
-    
-    // Transform rows to match frontend formatting
-    const jobs = result.rows.map(row => ({
-      id: row.id,
-      title: row.title,
-      company: row.company || 'Company',
-      location: row.location || 'Remote',
-      type: row.type || 'Full-time',
-      salary: row.salary || 'Competitive',
-      rating: '4.5',
-      tags: row.tags || ['General'],
-      posted: 'Recently',
-      logo: (row.company || 'C').charAt(0).toUpperCase()
-    }));
+    return NextResponse.json(
+      { success: true, job: inserted[0] },
+      { status: 201 }
+    );
+  } catch (error: any) {
+    console.error('POST /api/jobs error:', error);
+    return NextResponse.json(
+      { error: error?.message || 'Failed to create job posting' },
+      { status: 500 }
+    );
+  }
+}
 
-    return NextResponse.json({ success: true, jobs });
-  } catch (error) {
-    console.error("Fetch jobs error:", error);
-    return NextResponse.json({ error: "Failed to fetch jobs" }, { status: 500 });
+export async function PATCH(request: Request) {
+  try {
+    const body = await request.json();
+    const { id, status } = body;
+
+    if (!id || !status) {
+      return NextResponse.json(
+        { error: 'Job ID and status are required' },
+        { status: 400 }
+      );
+    }
+
+    const sql = neon(process.env.DATABASE_URL!);
+    await ensureJobsColumns(sql);
+
+    await sql`
+      UPDATE jobs
+      SET status = ${String(status).toUpperCase()}
+      WHERE id = ${Number(id)}
+    `;
+
+    return NextResponse.json({ success: true });
+  } catch (error: any) {
+    console.error('PATCH /api/jobs error:', error);
+    return NextResponse.json(
+      { error: 'Failed to update job status' },
+      { status: 500 }
+    );
   }
 }

@@ -51,44 +51,72 @@ export default function Header({ accentColor, isGlobal = false }: HeaderProps) {
   useEffect(() => {
     if (!isGlobal) return;
 
-    const savedUser = localStorage.getItem('user');
-    if (savedUser) {
-      try {
-        const parsedUser = JSON.parse(savedUser);
-        setIsLoggedIn(true);
-        setProfile((prev) => ({
-          ...prev,
-          name: parsedUser.name || '',
-          role: parsedUser.role || 'CANDIDATE',
-          email: parsedUser.email || '',
-          phone: parsedUser.phone || parsedUser.mobile || '',
-        }));
+    const loadUserAndProfile = () => {
+      const savedUser = localStorage.getItem('user');
+      if (savedUser) {
+        try {
+          const parsedUser = JSON.parse(savedUser);
+          setIsLoggedIn(true);
+          setProfile((prev) => ({
+            ...prev,
+            name: parsedUser.name || prev.name || '',
+            role: parsedUser.role || prev.role || 'CANDIDATE',
+            avatar: parsedUser.avatar || prev.avatar || '',
+            email: parsedUser.email || prev.email || '',
+            phone: parsedUser.phone || parsedUser.mobile || prev.phone || '',
+          }));
 
-        if (parsedUser.email) {
-          fetch(`/api/profile?email=${encodeURIComponent(parsedUser.email)}`)
-            .then((res) => res.json())
-            .then((data) => {
-              if (data && data.email) {
-                setProfile({
-                  name: data.name || parsedUser.name || '',
-                  role: data.role || parsedUser.role || 'CANDIDATE',
-                  avatar: data.avatar || '',
-                  email: data.email || parsedUser.email || '',
-                  phone: data.phone || data.mobile || parsedUser.phone || '',
-                  headline: data.headline || data.designation || '',
-                  searchAppearances: data.searchAppearances ?? 0,
-                  recruiterActions: data.recruiterActions ?? 0,
-                });
-              }
-            })
-            .catch(() => {});
+          if (parsedUser.email) {
+            fetch(`/api/profile?email=${encodeURIComponent(parsedUser.email)}`)
+              .then((res) => res.json())
+              .then((data) => {
+                if (data && data.email) {
+                  setProfile({
+                    name: data.name || parsedUser.name || '',
+                    role: data.role || parsedUser.role || 'CANDIDATE',
+                    avatar: data.avatar || parsedUser.avatar || '',
+                    email: data.email || parsedUser.email || '',
+                    phone: data.phone || data.mobile || parsedUser.phone || '',
+                    headline: data.designation || data.headline || '',
+                    searchAppearances: data.searchAppearances ?? 0,
+                    recruiterActions: data.recruiterActions ?? 0,
+                  });
+                }
+              })
+              .catch(() => {});
+          }
+        } catch {
+          setIsLoggedIn(false);
         }
-      } catch {
+      } else {
         setIsLoggedIn(false);
       }
-    } else {
-      setIsLoggedIn(false);
-    }
+    };
+
+    loadUserAndProfile();
+
+    const handleProfileUpdated = (event: Event) => {
+      const customEvent = event as CustomEvent;
+      if (customEvent.detail) {
+        setProfile((prev) => ({
+          ...prev,
+          name: customEvent.detail.name ?? prev.name,
+          avatar: customEvent.detail.avatar ?? prev.avatar,
+          headline: customEvent.detail.headline ?? prev.headline,
+          phone: customEvent.detail.phone ?? prev.phone,
+        }));
+      } else {
+        loadUserAndProfile();
+      }
+    };
+
+    window.addEventListener('profile-updated', handleProfileUpdated);
+    window.addEventListener('storage', loadUserAndProfile);
+
+    return () => {
+      window.removeEventListener('profile-updated', handleProfileUpdated);
+      window.removeEventListener('storage', loadUserAndProfile);
+    };
   }, [pathname, isGlobal]);
 
   // Hide duplicate inline ROLEMATCH. headers inside <main>
@@ -196,7 +224,7 @@ export default function Header({ accentColor, isGlobal = false }: HeaderProps) {
               ROLEMATCH<span className={dotColor}>.</span>
             </Link>
 
-            {/* EMPLOYER NAVIGATION MENU (Jobs & Responses, Resdex, Reports) */}
+            {/* EMPLOYER NAVIGATION MENU */}
             {isLoggedIn && isEmployerUser && (
               <div className="hidden md:flex items-center gap-8">
                 {/* 1. Jobs & Responses Dropdown */}
@@ -207,7 +235,8 @@ export default function Header({ accentColor, isGlobal = false }: HeaderProps) {
                 >
                   <button
                     className={`text-sm font-bold transition-colors pb-1 border-b-2 cursor-pointer ${
-                      activeEmployerMenu === 'jobs'
+                      activeEmployerMenu === 'jobs' ||
+                      pathname?.startsWith('/employer/jobs')
                         ? 'text-white border-pink-500'
                         : 'text-slate-300 hover:text-white border-transparent'
                     }`}
@@ -219,30 +248,36 @@ export default function Header({ accentColor, isGlobal = false }: HeaderProps) {
                     <div className="absolute left-0 top-full w-60 bg-slate-800 border border-slate-700 rounded-2xl shadow-2xl z-[999999] py-2.5 overflow-hidden">
                       <Link
                         href="/employer/jobs/new?type=free"
+                        onClick={() => setActiveEmployerMenu(null)}
                         className="block px-5 py-2.5 text-sm font-semibold text-slate-200 hover:bg-slate-700/70 hover:text-white transition-colors"
                       >
                         Post a Free Job
                       </Link>
                       <Link
                         href="/employer/jobs/new?type=hot"
+                        onClick={() => setActiveEmployerMenu(null)}
                         className="block px-5 py-2.5 text-sm font-semibold text-slate-200 hover:bg-slate-700/70 hover:text-white transition-colors"
                       >
                         Post a Hot Vacancy
                       </Link>
                       <Link
                         href="/employer/jobs/new?type=smb"
+                        onClick={() => setActiveEmployerMenu(null)}
                         className="block px-5 py-2.5 text-sm font-semibold text-slate-200 hover:bg-slate-700/70 hover:text-white transition-colors"
                       >
                         Post a SMB Job
                       </Link>
                       <Link
                         href="/employer/jobs/new?type=internship"
+                        onClick={() => setActiveEmployerMenu(null)}
                         className="block px-5 py-2.5 text-sm font-semibold text-slate-200 hover:bg-slate-700/70 hover:text-white transition-colors"
                       >
                         Post an Internship
                       </Link>
+                      {/* ROUTES DIRECTLY TO /employer/jobs (Manage Jobs and Responses) */}
                       <Link
-                        href="/employer/dashboard"
+                        href="/employer/jobs"
+                        onClick={() => setActiveEmployerMenu(null)}
                         className="block px-5 py-2.5 text-sm font-semibold text-slate-200 hover:bg-slate-700/70 hover:text-white transition-colors border-t border-slate-700/60 mt-1 pt-2.5"
                       >
                         Manage Jobs &amp; Responses
@@ -259,7 +294,8 @@ export default function Header({ accentColor, isGlobal = false }: HeaderProps) {
                 >
                   <button
                     className={`text-sm font-bold transition-colors pb-1 border-b-2 cursor-pointer ${
-                      activeEmployerMenu === 'resdex'
+                      activeEmployerMenu === 'resdex' ||
+                      pathname?.startsWith('/employer/talent')
                         ? 'text-white border-pink-500'
                         : 'text-slate-300 hover:text-white border-transparent'
                     }`}
@@ -271,30 +307,35 @@ export default function Header({ accentColor, isGlobal = false }: HeaderProps) {
                     <div className="absolute left-0 top-full w-56 bg-slate-800 border border-slate-700 rounded-2xl shadow-2xl z-[999999] py-2.5 overflow-hidden">
                       <Link
                         href="/employer/talent"
+                        onClick={() => setActiveEmployerMenu(null)}
                         className="block px-5 py-2.5 text-sm font-semibold text-slate-200 hover:bg-slate-700/70 hover:text-white transition-colors"
                       >
                         Search Resumes
                       </Link>
                       <Link
                         href="/employer/talent?action=nvite"
+                        onClick={() => setActiveEmployerMenu(null)}
                         className="block px-5 py-2.5 text-sm font-semibold text-slate-200 hover:bg-slate-700/70 hover:text-white transition-colors"
                       >
                         Send NVite
                       </Link>
                       <Link
                         href="/employer/talent?tab=searches"
+                        onClick={() => setActiveEmployerMenu(null)}
                         className="block px-5 py-2.5 text-sm font-semibold text-slate-200 hover:bg-slate-700/70 hover:text-white transition-colors"
                       >
                         Manage Searches
                       </Link>
                       <Link
                         href="/employer/talent?tab=folders"
+                        onClick={() => setActiveEmployerMenu(null)}
                         className="block px-5 py-2.5 text-sm font-semibold text-slate-200 hover:bg-slate-700/70 hover:text-white transition-colors"
                       >
                         Folders
                       </Link>
                       <Link
                         href="/employer/talent?tab=requirements"
+                        onClick={() => setActiveEmployerMenu(null)}
                         className="block px-5 py-2.5 text-sm font-semibold text-slate-200 hover:bg-slate-700/70 hover:text-white transition-colors"
                       >
                         Resdex Requirements
@@ -323,12 +364,14 @@ export default function Header({ accentColor, isGlobal = false }: HeaderProps) {
                     <div className="absolute left-0 top-full w-44 bg-slate-800 border border-slate-700 rounded-2xl shadow-2xl z-[999999] py-2.5 overflow-hidden">
                       <Link
                         href="/report?type=job-posting"
+                        onClick={() => setActiveEmployerMenu(null)}
                         className="block px-5 py-2.5 text-sm font-semibold text-slate-200 hover:bg-slate-700/70 hover:text-white transition-colors"
                       >
                         Job Posting
                       </Link>
                       <Link
                         href="/report?type=resdex"
+                        onClick={() => setActiveEmployerMenu(null)}
                         className="block px-5 py-2.5 text-sm font-semibold text-slate-200 hover:bg-slate-700/70 hover:text-white transition-colors"
                       >
                         Resdex
@@ -634,7 +677,6 @@ export default function Header({ accentColor, isGlobal = false }: HeaderProps) {
 
                   {/* Employer Drawer Menu List */}
                   <div className="py-4 px-3 space-y-1 border-b border-slate-800">
-                    {/* DIRECT LINK TO /employer/company-profile */}
                     <Link
                       href="/employer/company-profile"
                       onClick={() => setShowProfileDrawer(false)}
@@ -865,7 +907,7 @@ export default function Header({ accentColor, isGlobal = false }: HeaderProps) {
                         {profile.headline || profile.role || 'Candidate'}
                       </p>
                       <Link
-                        href="/candidate/dashboard"
+                        href="/candidate/profile"
                         onClick={() => setShowProfileDrawer(false)}
                         className="text-xs font-bold text-blue-400 hover:text-blue-300 transition-colors mt-2 inline-block"
                       >

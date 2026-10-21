@@ -5,470 +5,1154 @@ import { useRouter } from 'next/navigation';
 
 export default function EmployerRegisterPage() {
   const router = useRouter();
-  const [step, setStep] = useState<'mobile' | 'otp' | 'existing_modal' | 'basic_details' | 'company_details' | 'terms_modal'>('mobile');
-  const [mobile, setMobile] = useState('');
-  const [existingCompany, setExistingCompany] = useState('');
-  const [loading, setLoading] = useState(false);
-  
-  // 6-Digit OTP State
-  const [otp, setOtp] = useState(['', '', '', '', '', '']);
-  const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
-  const [otpError, setOtpError] = useState('');
 
-  // Form State
+  // Step 0 = Mobile & OTP verification | Step 1 = Basic details | Step 2 = Company details
+  const [step, setStep] = useState<0 | 1 | 2>(0);
+
   const [formData, setFormData] = useState({
-    accountType: 'company',
+    mobile: '',
+    accountType: 'company' as 'company' | 'individual',
     fullName: '',
     email: '',
     password: '',
-    hiringFor: 'your company',
     companyName: '',
-    industry: 'Technology',
-    employeeRange: '50-200',
+    industry: 'Software Services',
+    employees: '11-50',
     designation: '',
     pincode: '',
-    address: ''
+    city: '',
+    state: '',
+    address: '',
   });
-  const [registerError, setRegisterError] = useState('');
 
-  const handleSendOTP = async (e: React.FormEvent) => {
+  // Step 0 Mobile & OTP States
+  const [otpSent, setOtpSent] = useState(false);
+  const [otp, setOtp] = useState(['', '', '', '', '', '']);
+  const otpRefs = useRef<(HTMLInputElement | null)[]>([]);
+  const [mobileError, setMobileError] = useState('');
+  const [otpError, setOtpError] = useState('');
+
+  // Step 1 Email & Password States
+  const [emailError, setEmailError] = useState('');
+  const [emailTouched, setEmailTouched] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [isPasswordFocused, setIsPasswordFocused] = useState(false);
+
+  // Shared Button Loading & Error States
+  const [loadingAction, setLoadingAction] = useState<
+    'send-otp' | 'verify-otp' | 'step-1' | 'submit' | null
+  >(null);
+  const [formError, setFormError] = useState('');
+
+  // Strict Enterprise Email & Password Regexes
+  const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+  const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{8,}$/;
+  const isPasswordValid = passwordRegex.test(formData.password);
+
+  // Live Email Format Validator (Catches spaces & invalid formats immediately)
+  const validateEmailFormat = (rawEmail: string): string => {
+    if (!rawEmail) {
+      return 'Please enter your official email ID.';
+    }
+    if (/\s/.test(rawEmail)) {
+      return 'Please correct email format (spaces are not allowed).';
+    }
+    if (!emailRegex.test(rawEmail)) {
+      return 'Please correct email format (e.g. name@company.com).';
+    }
+    return '';
+  };
+
+  // ---------------------------------------------------------------------------
+  // STEP 0 HANDLERS: MOBILE DB CHECK & OTP
+  // ---------------------------------------------------------------------------
+  const handleSendMobileOtp = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!mobile || mobile.length < 10) {
-      alert('Please enter a valid mobile number.');
+    setMobileError('');
+    const cleanMobile = formData.mobile.replace(/\D/g, '');
+
+    if (cleanMobile.length !== 10) {
+      setMobileError('Please enter a valid 10-digit mobile number.');
       return;
     }
-    setLoading(true);
 
+    setLoadingAction('send-otp');
     try {
-      const response = await fetch(`/api/employer/check-mobile?mobile=${encodeURIComponent(mobile.trim())}`);
-      if (response.ok) {
-        const data = await response.json();
-        if (data.exists) {
-          setExistingCompany(data.companyName || 'Existing Account');
-          setLoading(false);
-          setStep('existing_modal');
-          return;
-        }
+      await new Promise((r) => setTimeout(r, 1200));
+      const res = await fetch('/api/register/check', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mobile: cleanMobile }),
+      });
+      const data = await res.json();
+
+      if (!res.ok || data.exists) {
+        setMobileError(
+          data.error || 'This mobile number is already registered.'
+        );
+        setLoadingAction(null);
+        return;
       }
-    } catch (err) {
-      console.error('Database check error:', err);
-    }
 
-    if (mobile.trim() === '9035911873') {
-      setExistingCompany('Anu Anjani');
-      setLoading(false);
-      setStep('existing_modal');
-      return;
+      setOtp(['', '', '', '', '', '']);
+      setOtpSent(true);
+    } catch {
+      setMobileError(
+        'Unable to verify mobile number right now. Please try again.'
+      );
+    } finally {
+      setLoadingAction(null);
     }
-
-    setLoading(false);
-    setStep('otp');
   };
 
   const handleOtpChange = (value: string, index: number) => {
     if (isNaN(Number(value))) return;
-    const newOtp = [...otp];
-    newOtp[index] = value;
-    setOtp(newOtp);
-
+    const updated = [...otp];
+    updated[index] = value;
+    setOtp(updated);
     if (value && index < 5) {
-      inputRefs.current[index + 1]?.focus();
+      otpRefs.current[index + 1]?.focus();
     }
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent, index: number) => {
+  const handleOtpKeyDown = (e: React.KeyboardEvent, index: number) => {
     if (e.key === 'Backspace' && !otp[index] && index > 0) {
-      inputRefs.current[index - 1]?.focus();
+      otpRefs.current[index - 1]?.focus();
     }
   };
 
-  const handleVerifyOTP = async (e: React.FormEvent) => {
+  const handleVerifyMobileOtp = async (e: React.FormEvent) => {
     e.preventDefault();
-    const enteredOtp = otp.join('');
-    
-    if (enteredOtp !== '000000') {
+    setOtpError('');
+    if (otp.join('') !== '000000') {
       setOtpError('Invalid OTP. Use dummy OTP: 000000');
       return;
     }
 
-    setLoading(true);
-    await new Promise(r => setTimeout(r, 500));
-    setLoading(false);
-    setStep('basic_details');
+    setLoadingAction('verify-otp');
+    await new Promise((r) => setTimeout(r, 1200));
+    setLoadingAction(null);
+    setStep(1);
   };
 
-  const handleAcceptTermsAndRegister = async () => {
-    setLoading(true);
-    setRegisterError('');
+  // ---------------------------------------------------------------------------
+  // STEP 1 HANDLER: VALIDATE EMAIL FORMAT + NEON DB + ENTERPRISE PASSWORD CHECK
+  // ---------------------------------------------------------------------------
+  const handleContinueStep1 = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setFormError('');
+    setEmailTouched(true);
+
+    if (!formData.fullName.trim()) {
+      setFormError('Please enter your full name.');
+      return;
+    }
+
+    const formatErr = validateEmailFormat(formData.email);
+    if (formatErr) {
+      setEmailError(formatErr);
+      return;
+    }
+
+    const cleanEmail = formData.email.trim().toLowerCase();
+
+    if (!isPasswordValid) {
+      setIsPasswordFocused(true);
+      setFormError(
+        'Password must include uppercase, lowercase, number, special character, and at least 8 characters.'
+      );
+      return;
+    }
+
+    setLoadingAction('step-1');
 
     try {
+      await new Promise((r) => setTimeout(r, 1200));
+      const res = await fetch('/api/register/check', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: cleanEmail }),
+      });
+      const data = await res.json();
+
+      if (!res.ok || data.exists) {
+        setEmailError(
+          data.error ||
+            'This Email ID is already registered. Please sign in or use a different email.'
+        );
+        setLoadingAction(null);
+        return;
+      }
+
+      if (!formData.companyName) {
+        setFormData((prev) => ({
+          ...prev,
+          companyName: prev.fullName.trim(),
+        }));
+      }
+
+      setLoadingAction(null);
+      setStep(2);
+    } catch {
+      setEmailError(
+        'Failed to validate email with database. Please try again.'
+      );
+      setLoadingAction(null);
+    }
+  };
+
+  // ---------------------------------------------------------------------------
+  // STEP 2 HANDLER: FINAL EMPLOYER REGISTRATION SUBMIT
+  // ---------------------------------------------------------------------------
+  const handleFinalSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setFormError('');
+
+    if (!formData.companyName.trim() || !formData.designation.trim()) {
+      setFormError('Please fill in all required company details.');
+      return;
+    }
+
+    setLoadingAction('submit');
+
+    try {
+      await new Promise((r) => setTimeout(r, 1400));
       const res = await fetch('/api/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          name: formData.fullName,
-          email: formData.email,
+          name: formData.fullName.trim(),
+          email: formData.email.trim().toLowerCase(),
           password: formData.password,
-          mobileNumber: mobile,
-          role: 'EMPLOYER',
-          accountType: formData.accountType,
-          companyName: formData.companyName,
+          mobileNumber: formData.mobile.replace(/\D/g, ''),
+          hiringFor: formData.accountType,
+          companyName: formData.companyName.trim(),
           industry: formData.industry,
-          designation: formData.designation,
-          address: formData.address,
-          termsAccepted: true,
-          termsAcceptedAt: new Date().toISOString()
-        })
+          employees: formData.employees,
+          designation: formData.designation.trim(),
+          pincode: formData.pincode.trim(),
+          city: formData.city.trim(),
+          state: formData.state.trim(),
+          address: formData.address.trim(),
+          role: 'EMPLOYER',
+        }),
       });
-      const data = await res.json();
 
-      if (res.ok || (data.error && data.error.includes('already exists'))) {
-        localStorage.setItem('user', JSON.stringify({ name: formData.companyName || formData.fullName, email: formData.email, role: 'EMPLOYER' }));
-        router.push('/employer/dashboard');
-      } else {
-        setRegisterError(data.error || 'Registration failed.');
-        setStep('company_details');
+      const data = await res.json();
+      if (!res.ok) {
+        setFormError(data.error || 'Registration failed.');
+        setLoadingAction(null);
+        return;
       }
-    } catch (err) {
-      localStorage.setItem('user', JSON.stringify({ name: formData.companyName || 'TechCorp', email: formData.email || 'recruiter@company.com', role: 'EMPLOYER' }));
+
+      localStorage.setItem(
+        'user',
+        JSON.stringify({
+          name: formData.fullName.trim(),
+          companyName: formData.companyName.trim(),
+          email: formData.email.trim().toLowerCase(),
+          phone: formData.mobile.replace(/\D/g, ''),
+          role: 'EMPLOYER',
+        })
+      );
+
       router.push('/employer/dashboard');
-    } finally {
-      setLoading(false);
+    } catch {
+      setFormError('Failed to connect to server. Please try again.');
+      setLoadingAction(null);
     }
   };
 
+  // Helper to render the exact Login Page button + shimmer + spinner animation
+  const renderEnterpriseButton = ({
+    isLoading,
+    isDisabled,
+    idleText,
+    loadingText,
+  }: {
+    isLoading: boolean;
+    isDisabled?: boolean;
+    idleText: string;
+    loadingText: string;
+  }) => (
+    <button
+      type="submit"
+      disabled={isLoading || isDisabled}
+      className={`relative overflow-hidden flex h-14 w-full items-center justify-center rounded-xl font-extrabold text-xs uppercase tracking-widest transition-all duration-300 mt-6 ${
+        isLoading
+          ? 'cursor-wait bg-slate-800 text-slate-300 border border-slate-700'
+          : isDisabled
+          ? 'cursor-not-allowed bg-slate-800/50 text-slate-500 border border-slate-800 opacity-60'
+          : 'bg-white text-slate-950 hover:bg-slate-200 shadow-lg cursor-pointer'
+      }`}
+    >
+      {isLoading && (
+        <div
+          className="absolute inset-0 w-full h-full bg-gradient-to-r from-transparent via-white/20 to-transparent -skew-x-12"
+          style={{ animation: 'shimmer 1.5s infinite' }}
+        ></div>
+      )}
+      <div className="relative z-10 flex items-center gap-3">
+        {isLoading ? (
+          <>
+            <svg
+              className="w-4 h-4 animate-spin text-indigo-400"
+              fill="none"
+              viewBox="0 0 24 24"
+            >
+              <circle
+                className="opacity-25"
+                cx="12"
+                cy="12"
+                r="10"
+                stroke="currentColor"
+                strokeWidth="4"
+              ></circle>
+              <path
+                className="opacity-75"
+                fill="currentColor"
+                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+              ></path>
+            </svg>
+            <span>{loadingText}</span>
+          </>
+        ) : (
+          <span>{idleText}</span>
+        )}
+      </div>
+    </button>
+  );
+
   return (
-    <div className="min-h-screen bg-slate-900 text-slate-100 font-sans selection:bg-indigo-500/30 flex items-center justify-center relative p-6">
+    <div className="min-h-screen bg-slate-900 text-slate-100 font-sans selection:bg-indigo-500/30 flex items-center justify-center relative p-6 py-24">
+      {/* Login-Identical Shimmer Keyframes */}
+      <style>{`
+        @keyframes shimmer {
+          0% { transform: translateX(-100%); }
+          100% { transform: translateX(100%); }
+        }
+      `}</style>
+
+      {/* Ambient Glow */}
       <div className="absolute top-[10%] left-[20%] w-[600px] h-[600px] bg-indigo-600/20 blur-[150px] rounded-full pointer-events-none"></div>
 
-      <div className="absolute top-0 left-0 w-full p-8 flex items-center z-20">
-        <Link href="/" className="text-2xl font-extrabold tracking-tighter text-white">
-          ROLEMATCH<span className="text-indigo-500">.</span>
-        </Link>
-      </div>
-
-      <div className="group w-full max-w-6xl h-[620px] rounded-[2.5rem] bg-slate-800/40 backdrop-blur-xl border border-slate-700/50 flex flex-col md:flex-row overflow-hidden relative z-10 shadow-2xl">
-        
-        <Link href="/" className="absolute top-6 right-6 w-10 h-10 rounded-full bg-slate-900 border border-slate-700 flex items-center justify-center hover:bg-slate-700 hover:text-indigo-400 transition-all text-slate-400 z-50 shadow-md">
+      {/* Main Card with `group` so top-right (✕) hides when cursor leaves card */}
+      <div className="group w-full max-w-5xl rounded-[2rem] bg-slate-800/40 backdrop-blur-xl border border-slate-700/50 flex flex-col md:flex-row overflow-hidden relative z-10 shadow-2xl">
+        {/* Top Right Close Button (Appears on card hover just like Login page) */}
+        <Link
+          href="/"
+          className="opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto absolute top-6 right-6 md:top-8 md:right-8 w-10 h-10 rounded-full bg-slate-900 border border-slate-700 flex items-center justify-center hover:bg-slate-700 hover:text-indigo-400 transition-all duration-300 text-slate-400 z-50 shadow-[0_0_15px_rgba(0,0,0,0.5)]"
+        >
           ✕
         </Link>
 
-        {/* Left Hero Section */}
-        <div className="w-full md:w-5/12 bg-slate-900/50 p-12 lg:p-16 flex flex-col justify-center border-r border-slate-700/50">
-          <h1 className="text-4xl lg:text-5xl font-extrabold tracking-tighter text-white mb-6 leading-tight">
-            Find & hire the right talent with us
-          </h1>
-          <p className="text-sm text-slate-400 font-medium mb-10">
-            Trusted by 9 Cr+ candidates | 5 Lakh+ employers
-          </p>
-          <div className="flex items-center gap-3">
-            <div className="flex -space-x-3 overflow-hidden">
-              <div className="inline-block h-10 w-10 rounded-full bg-indigo-500 border-2 border-slate-900 flex items-center justify-center font-bold text-xs text-white">JD</div>
-              <div className="inline-block h-10 w-10 rounded-full bg-emerald-500 border-2 border-slate-900 flex items-center justify-center font-bold text-xs text-white">AS</div>
-              <div className="inline-block h-10 w-10 rounded-full bg-pink-500 border-2 border-slate-900 flex items-center justify-center font-bold text-xs text-white">MK</div>
-              <div className="inline-block h-10 w-10 rounded-full bg-amber-500 border-2 border-slate-900 flex items-center justify-center font-bold text-xs text-white">TS</div>
+        {/* ============================================================
+            LEFT ENTERPRISE INFO PANEL
+           ============================================================ */}
+        <div className="w-full md:w-5/12 bg-slate-900/50 p-10 lg:p-12 flex flex-col border-r border-slate-700/50 justify-between">
+          <div>
+            <div className="inline-block px-3.5 py-1 rounded-full bg-slate-800 border border-slate-700 text-[10px] font-extrabold uppercase tracking-widest text-indigo-400 mb-6">
+              Enterprise Talent Cloud
             </div>
-            <span className="text-xs text-slate-400 font-medium ml-2">Join thousands of recruiters</span>
+
+            <h2 className="text-3xl sm:text-4xl font-extrabold tracking-tighter text-white leading-[1.1] mb-4">
+              Find &amp; hire the{' '}
+              <span className="text-indigo-400">right talent</span> with us.
+            </h2>
+            <p className="text-xs sm:text-sm font-medium text-slate-400 mb-8">
+              Trusted by 9 Cr+ candidates | 5 Lakh+ employers
+            </p>
+
+            {/* Enterprise Value Checklist */}
+            <div className="space-y-4 mb-10">
+              <div className="flex items-start gap-3.5">
+                <svg
+                  className="w-5 h-5 text-emerald-400 mt-0.5 shrink-0"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="3"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M5 13l4 4L19 7"
+                  ></path>
+                </svg>
+                <p className="text-xs sm:text-sm font-medium text-slate-300">
+                  Post jobs in 2 minutes &amp; receive verified applicant
+                  profiles
+                </p>
+              </div>
+              <div className="flex items-start gap-3.5">
+                <svg
+                  className="w-5 h-5 text-emerald-400 mt-0.5 shrink-0"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="3"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M5 13l4 4L19 7"
+                  ></path>
+                </svg>
+                <p className="text-xs sm:text-sm font-medium text-slate-300">
+                  Instant access to Resdex database with smart skill filters
+                </p>
+              </div>
+              <div className="flex items-start gap-3.5">
+                <svg
+                  className="w-5 h-5 text-emerald-400 mt-0.5 shrink-0"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="3"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M5 13l4 4L19 7"
+                  ></path>
+                </svg>
+                <p className="text-xs sm:text-sm font-medium text-slate-300">
+                  Enterprise-grade KYC security &amp; dedicated sub-user roles
+                </p>
+              </div>
+            </div>
+
+            {/* Recruiter Avatar Stack */}
+            <div className="flex items-center gap-4">
+              <div className="flex -space-x-2.5">
+                <div className="w-9 h-9 rounded-full bg-indigo-600 border-2 border-slate-900 flex items-center justify-center text-[11px] font-extrabold text-white">
+                  JD
+                </div>
+                <div className="w-9 h-9 rounded-full bg-emerald-600 border-2 border-slate-900 flex items-center justify-center text-[11px] font-extrabold text-white">
+                  AS
+                </div>
+                <div className="w-9 h-9 rounded-full bg-pink-600 border-2 border-slate-900 flex items-center justify-center text-[11px] font-extrabold text-white">
+                  MK
+                </div>
+                <div className="w-9 h-9 rounded-full bg-amber-500 border-2 border-slate-900 flex items-center justify-center text-[11px] font-extrabold text-slate-950">
+                  TS
+                </div>
+              </div>
+              <span className="text-xs font-semibold text-slate-400">
+                Join thousands of recruiters
+              </span>
+            </div>
+          </div>
+
+          <div className="pt-6 mt-8 border-t border-slate-800/80 text-xs text-slate-400">
+            Looking for a job instead?{' '}
+            <Link
+              href="/register"
+              className="text-pink-400 font-bold hover:underline"
+            >
+              Register as Candidate &rarr;
+            </Link>
           </div>
         </div>
 
-        {/* Right Form Section */}
-        <div className="w-full md:w-7/12 p-12 lg:p-16 flex flex-col justify-center bg-slate-900/20 relative">
-          
-          {step === 'mobile' && (
-            <>
-              <h2 className="text-2xl font-extrabold tracking-tight text-white mb-6">Continue with mobile</h2>
-              <form onSubmit={handleSendOTP} className="space-y-6">
-                <div>
-                  <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Mobile number</label>
-                  <div className="flex bg-slate-900 border border-slate-700 rounded-xl overflow-hidden focus-within:border-indigo-500 transition-colors">
-                    <div className="bg-slate-800 px-4 py-3.5 text-sm font-bold text-slate-300 border-r border-slate-700 flex items-center gap-1">+91</div>
-                    <input 
-                      type="tel" 
-                      required 
-                      placeholder="Enter mobile number"
-                      value={mobile}
-                      onChange={(e) => setMobile(e.target.value)}
-                      className="flex-1 bg-transparent px-4 py-3.5 text-sm text-white outline-none font-medium" 
+        {/* ============================================================
+            RIGHT FORM PANEL
+           ============================================================ */}
+        <div className="w-full md:w-7/12 p-10 lg:p-12 flex flex-col justify-between">
+          <div>
+            {/* Enterprise 3-Step Progress Bar */}
+            <div className="flex items-center gap-2 mb-8 pr-10">
+              {[
+                { idx: 0, label: '1. Mobile OTP' },
+                { idx: 1, label: '2. Basic Details' },
+                { idx: 2, label: '3. Company Info' },
+              ].map((item) => {
+                const isActive = step === item.idx;
+                const isDone = step > item.idx;
+                return (
+                  <div key={item.idx} className="flex-1">
+                    <div
+                      className={`h-1.5 rounded-full transition-all duration-300 ${
+                        isDone
+                          ? 'bg-emerald-500'
+                          : isActive
+                          ? 'bg-indigo-500'
+                          : 'bg-slate-800'
+                      }`}
                     />
+                    <span
+                      className={`block text-[10px] font-extrabold uppercase tracking-wider mt-2 ${
+                        isDone
+                          ? 'text-emerald-400'
+                          : isActive
+                          ? 'text-white'
+                          : 'text-slate-500'
+                      }`}
+                    >
+                      {isDone ? `✓ ${item.label.slice(3)}` : item.label}
+                    </span>
                   </div>
-                </div>
-                <button type="submit" disabled={loading} className="w-full py-4 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs uppercase tracking-widest shadow-lg shadow-indigo-600/30 transition cursor-pointer">
-                  {loading ? 'Checking Database...' : 'Send OTP'}
-                </button>
-              </form>
-            </>
-          )}
+                );
+              })}
+            </div>
 
-          {step === 'otp' && (
-            <>
-              <div className="mb-6">
-                <h2 className="text-xl font-extrabold tracking-tight text-white mb-2">Enter the OTP sent to SMS on</h2>
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-bold text-indigo-400">+91 {mobile}</span>
-                  <button onClick={() => setStep('mobile')} className="text-xs text-slate-400 underline hover:text-white">Edit</button>
-                </div>
+            {step === 0 && (
+              /* STEP 0: MOBILE VERIFICATION */
+              <div>
+                <h1 className="text-3xl font-extrabold tracking-tighter text-white mb-2">
+                  Verify Mobile Number
+                </h1>
+                <p className="text-sm text-slate-400 font-medium mb-8">
+                  Enter your official 10-digit mobile number to begin employer
+                  onboarding.
+                </p>
+
+                {!otpSent ? (
+                  <form
+                    noValidate
+                    onSubmit={handleSendMobileOtp}
+                    className="space-y-5"
+                  >
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <label className="text-[10px] font-bold uppercase tracking-widest text-slate-500">
+                          Mobile Number *
+                        </label>
+                        <span className="text-[10px] font-bold text-slate-500">
+                          {formData.mobile.length}/10 digits
+                        </span>
+                      </div>
+
+                      <div
+                        className={`flex h-14 bg-slate-900 border rounded-xl overflow-hidden transition-colors ${
+                          mobileError
+                            ? 'border-red-500 focus-within:border-red-500'
+                            : 'border-slate-700 focus-within:border-indigo-500'
+                        }`}
+                      >
+                        <div className="bg-slate-800 px-5 text-sm font-bold text-slate-400 border-r border-slate-700 flex items-center justify-center shrink-0">
+                          +91
+                        </div>
+                        <input
+                          type="tel"
+                          required
+                          maxLength={10}
+                          placeholder="Enter 10-digit mobile number"
+                          value={formData.mobile}
+                          onChange={(e) => {
+                            const digits = e.target.value
+                              .replace(/\D/g, '')
+                              .slice(0, 10);
+                            setFormData({ ...formData, mobile: digits });
+                            setMobileError('');
+                          }}
+                          className="flex-1 bg-transparent px-4 text-sm text-white outline-none"
+                        />
+                      </div>
+
+                      {mobileError && (
+                        <p className="text-red-400 text-xs font-bold bg-red-500/10 p-3 rounded-xl border border-red-500/20 mt-3">
+                          {mobileError}
+                        </p>
+                      )}
+                    </div>
+
+                    {renderEnterpriseButton({
+                      isLoading: loadingAction === 'send-otp',
+                      isDisabled: formData.mobile.length !== 10,
+                      idleText: 'CONTINUE',
+                      loadingText: 'VERIFYING NUMBER...',
+                    })}
+                  </form>
+                ) : (
+                  <form
+                    noValidate
+                    onSubmit={handleVerifyMobileOtp}
+                    className="space-y-5"
+                  >
+                    <div className="p-5 rounded-2xl bg-slate-900/70 border border-slate-800">
+                      <div className="flex items-center justify-between mb-4">
+                        <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                          Enter 6-Digit OTP sent to +91 {formData.mobile}
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => setOtpSent(false)}
+                          className="text-xs font-bold text-indigo-400 hover:underline cursor-pointer"
+                        >
+                          Change Number
+                        </button>
+                      </div>
+
+                      <div className="flex gap-2.5 sm:gap-3 justify-start mb-3">
+                        {otp.map((digit, idx) => (
+                          <input
+                            key={idx}
+                            ref={(el) => {
+                              otpRefs.current[idx] = el;
+                            }}
+                            type="text"
+                            maxLength={1}
+                            value={digit}
+                            onChange={(e) =>
+                              handleOtpChange(e.target.value, idx)
+                            }
+                            onKeyDown={(e) => handleOtpKeyDown(e, idx)}
+                            className="w-11 h-12 sm:w-12 sm:h-13 bg-slate-950 border border-slate-700 rounded-xl text-center text-base font-bold text-white outline-none focus:border-indigo-500"
+                          />
+                        ))}
+                      </div>
+                      <p className="text-[11px] text-slate-500 italic">
+                        Use enterprise test OTP: 000000
+                      </p>
+
+                      {otpError && (
+                        <p className="text-red-400 text-xs font-bold bg-red-500/10 p-2.5 rounded-xl border border-red-500/20 mt-3">
+                          {otpError}
+                        </p>
+                      )}
+                    </div>
+
+                    {renderEnterpriseButton({
+                      isLoading: loadingAction === 'verify-otp',
+                      isDisabled: otp.join('').length !== 6,
+                      idleText: 'VERIFY & CONTINUE',
+                      loadingText: 'VERIFYING OTP...',
+                    })}
+                  </form>
+                )}
               </div>
+            )}
 
-              <form onSubmit={handleVerifyOTP} className="space-y-6">
-                <div className="flex gap-3 justify-between">
-                  {otp.map((digit, index) => (
+            {step === 1 && (
+              /* STEP 1: BASIC DETAILS */
+              <div>
+                <div className="flex items-start justify-between mb-6">
+                  <div>
+                    <h1 className="text-3xl font-extrabold tracking-tighter text-white">
+                      Basic Details
+                    </h1>
+                    <p className="text-sm text-slate-400 font-medium mt-1">
+                      Set up your recruiter credentials and account type.
+                    </p>
+                  </div>
+                  {formData.mobile && (
+                    <span className="px-3 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-xs font-bold shrink-0">
+                      ✓ +91 {formData.mobile}
+                    </span>
+                  )}
+                </div>
+
+                <form
+                  noValidate
+                  onSubmit={handleContinueStep1}
+                  className="space-y-5"
+                >
+                  {/* Account Type Enterprise Cards */}
+                  <div>
+                    <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2.5">
+                      YOU&apos;RE CREATING ACCOUNT AS *
+                    </label>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setFormData({ ...formData, accountType: 'company' })
+                        }
+                        className={`p-3.5 rounded-xl border text-left transition-all cursor-pointer flex items-center gap-3 ${
+                          formData.accountType === 'company'
+                            ? 'border-indigo-500 bg-indigo-500/10 text-white'
+                            : 'border-slate-700 bg-slate-900 text-slate-300 hover:border-slate-600'
+                        }`}
+                      >
+                        <span
+                          className={`w-4 h-4 rounded-full border flex items-center justify-center shrink-0 ${
+                            formData.accountType === 'company'
+                              ? 'border-indigo-400 bg-indigo-600'
+                              : 'border-slate-500'
+                          }`}
+                        >
+                          {formData.accountType === 'company' && (
+                            <span className="w-1.5 h-1.5 rounded-full bg-white" />
+                          )}
+                        </span>
+                        <div>
+                          <span className="block text-xs font-extrabold text-white">
+                            Company / Business
+                          </span>
+                          <span className="block text-[10px] text-slate-400">
+                            Corporate or agency hiring
+                          </span>
+                        </div>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setFormData({
+                            ...formData,
+                            accountType: 'individual',
+                          })
+                        }
+                        className={`p-3.5 rounded-xl border text-left transition-all cursor-pointer flex items-center gap-3 ${
+                          formData.accountType === 'individual'
+                            ? 'border-indigo-500 bg-indigo-500/10 text-white'
+                            : 'border-slate-700 bg-slate-900 text-slate-300 hover:border-slate-600'
+                        }`}
+                      >
+                        <span
+                          className={`w-4 h-4 rounded-full border flex items-center justify-center shrink-0 ${
+                            formData.accountType === 'individual'
+                              ? 'border-indigo-400 bg-indigo-600'
+                              : 'border-slate-500'
+                          }`}
+                        >
+                          {formData.accountType === 'individual' && (
+                            <span className="w-1.5 h-1.5 rounded-full bg-white" />
+                          )}
+                        </span>
+                        <div>
+                          <span className="block text-xs font-extrabold text-white">
+                            Individual / Proprietor
+                          </span>
+                          <span className="block text-[10px] text-slate-400">
+                            Independent proprietor
+                          </span>
+                        </div>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Full Name */}
+                  <div>
+                    <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">
+                      FULL NAME *
+                    </label>
                     <input
-                      key={index}
-                      ref={(el) => { inputRefs.current[index] = el; }}
                       type="text"
-                      maxLength={1}
-                      value={digit}
-                      onChange={(e) => handleOtpChange(e.target.value, index)}
-                      onKeyDown={(e) => handleKeyDown(e, index)}
-                      className="w-12 h-14 bg-slate-900 border border-slate-700 rounded-xl text-center text-xl font-extrabold text-white outline-none focus:border-indigo-500 transition-colors"
+                      required
+                      placeholder="Enter your full name"
+                      value={formData.fullName}
+                      onChange={(e) =>
+                        setFormData({ ...formData, fullName: e.target.value })
+                      }
+                      className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3.5 text-sm text-white outline-none focus:border-indigo-500 transition-colors"
                     />
-                  ))}
-                </div>
-                {otpError && <p className="text-red-400 text-xs font-bold bg-red-500/10 p-3 rounded-lg border border-red-500/20">{otpError}</p>}
-                <p className="text-[11px] text-slate-500 italic">Hint: Use OTP 000000</p>
-                <button type="submit" disabled={loading} className="w-full py-4 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs uppercase tracking-widest shadow-lg shadow-indigo-600/30 transition cursor-pointer">
-                  {loading ? 'Verifying...' : 'Verify OTP'}
-                </button>
-              </form>
-            </>
-          )}
-
-          {/* STEP 1: BASIC DETAILS */}
-          {step === 'basic_details' && (
-            <>
-              <div className="mb-4 border-b border-slate-700/50 pb-3 flex justify-between items-center">
-                <div>
-                  <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest block">Step 1 of 2</span>
-                  <h2 className="text-xl font-extrabold tracking-tight text-white">Basic details</h2>
-                </div>
-                <span className="text-xs text-slate-400 font-medium">+91 {mobile}</span>
-              </div>
-
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">You're creating account as</label>
-                  <div className="flex gap-6 text-xs font-bold text-slate-300">
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input type="radio" name="accountType" checked={formData.accountType === 'company'} onChange={() => setFormData({...formData, accountType: 'company'})} className="accent-indigo-600" />
-                      Company/business
-                    </label>
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input type="radio" name="accountType" checked={formData.accountType === 'individual'} onChange={() => setFormData({...formData, accountType: 'individual'})} className="accent-indigo-600" />
-                      Individual/proprietor
-                    </label>
                   </div>
-                </div>
 
-                <div>
-                  <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-1">Full name *</label>
-                  <input type="text" required placeholder="Name as per PAN" value={formData.fullName} onChange={(e) => setFormData({...formData, fullName: e.target.value})} className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white outline-none focus:border-indigo-500" />
-                </div>
-
-                <div>
-                  <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-1">Official email ID *</label>
-                  <input type="email" required placeholder="Enter email ID" value={formData.email} onChange={(e) => setFormData({...formData, email: e.target.value})} className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white outline-none focus:border-indigo-500" />
-                </div>
-
-                <div>
-                  <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-1">Create password *</label>
-                  <input type="password" required placeholder="Enter new password" value={formData.password} onChange={(e) => setFormData({...formData, password: e.target.value})} className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white outline-none focus:border-indigo-500" />
-                </div>
-
-                <button 
-                  type="button" 
-                  onClick={() => {
-                    if (!formData.fullName || !formData.email || !formData.password) {
-                      alert('Please fill in all basic details.');
-                      return;
-                    }
-                    setStep('company_details');
-                  }} 
-                  className="w-full py-3.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs uppercase tracking-widest shadow-lg shadow-indigo-600/30 transition cursor-pointer mt-2"
-                >
-                  Continue
-                </button>
-              </div>
-            </>
-          )}
-
-          {/* STEP 2: COMPANY DETAILS */}
-          {step === 'company_details' && (
-            <>
-              <div className="mb-4 border-b border-slate-700/50 pb-3 flex justify-between items-center">
-                <div>
-                  <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest block">Step 2 of 2</span>
-                  <h2 className="text-xl font-extrabold tracking-tight text-white">Company details</h2>
-                </div>
-                <button onClick={() => setStep('basic_details')} className="text-xs text-slate-400 hover:text-white underline">Back</button>
-              </div>
-
-              <div className="space-y-4 max-h-[380px] overflow-y-auto pr-1">
-                <div>
-                  <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-1">Hiring for</label>
-                  <div className="flex gap-6 text-xs font-bold text-slate-300">
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input type="radio" name="hiringFor" checked={formData.hiringFor === 'your company'} onChange={() => setFormData({...formData, hiringFor: 'your company'})} className="accent-indigo-600" />
-                      Your company
-                    </label>
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input type="radio" name="hiringFor" checked={formData.hiringFor === 'consultancy'} onChange={() => setFormData({...formData, hiringFor: 'consultancy'})} className="accent-indigo-600" />
-                      A consultancy
-                    </label>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-1">Company name *</label>
-                  <input type="text" required placeholder="Enter company name" value={formData.companyName} onChange={(e) => setFormData({...formData, companyName: e.target.value})} className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white outline-none focus:border-indigo-500" />
-                </div>
-
-                <div>
-                  <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-1">Select industry</label>
-                  <select value={formData.industry} onChange={(e) => setFormData({...formData, industry: e.target.value})} className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white outline-none focus:border-indigo-500">
-                    <option value="Technology">Technology / Software</option>
-                    <option value="Finance">Banking & Finance</option>
-                    <option value="Healthcare">Healthcare & Biotech</option>
-                    <option value="E-Commerce">E-Commerce & Retail</option>
-                  </select>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
+                  {/* Official Email ID (Live Format & Space Check + Neon DB Check) */}
                   <div>
-                    <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-1">Designation *</label>
-                    <input type="text" required placeholder="Your designation" value={formData.designation} onChange={(e) => setFormData({...formData, designation: e.target.value})} className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white outline-none focus:border-indigo-500" />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-1">Pin code</label>
-                    <input type="text" placeholder="Postal code" value={formData.pincode} onChange={(e) => setFormData({...formData, pincode: e.target.value})} className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white outline-none focus:border-indigo-500" />
-                  </div>
-                </div>
+                    <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">
+                      OFFICIAL EMAIL ID *
+                    </label>
+                    <input
+                      type="email"
+                      required
+                      placeholder="name@company.com"
+                      value={formData.email}
+                      onBlur={() => {
+                        setEmailTouched(true);
+                        if (formData.email) {
+                          setEmailError(validateEmailFormat(formData.email));
+                        }
+                      }}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setFormData({ ...formData, email: val });
 
-                <div>
-                  <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-1">Company address</label>
-                  <textarea rows={2} placeholder="Enter company address" value={formData.address} onChange={(e) => setFormData({...formData, address: e.target.value})} className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2 text-sm text-white outline-none focus:border-indigo-500 resize-none"></textarea>
-                </div>
+                        // Immediately flag spaces or update validation if already touched
+                        if (/\s/.test(val)) {
+                          setEmailError(
+                            'Please correct email format (spaces are not allowed).'
+                          );
+                        } else if (emailTouched && val) {
+                          setEmailError(validateEmailFormat(val));
+                        } else {
+                          setEmailError('');
+                        }
+                      }}
+                      className={`w-full bg-slate-900 border rounded-xl px-4 py-3.5 text-sm text-white outline-none transition-colors ${
+                        emailError
+                          ? 'border-red-500 focus:border-red-500'
+                          : 'border-slate-700 focus:border-indigo-500'
+                      }`}
+                    />
+                    {emailError && (
+                      <p className="text-red-400 text-xs font-bold bg-red-500/10 px-3.5 py-2.5 rounded-xl border border-red-500/20 mt-2 flex items-center gap-2">
+                        <span>⚠</span>
+                        <span>{emailError}</span>
+                      </p>
+                    )}
+                  </div>
 
-                <button 
-                  type="button" 
-                  onClick={() => {
-                    if (!formData.companyName || !formData.designation) {
-                      alert('Please fill in required company details.');
-                      return;
-                    }
-                    setStep('terms_modal');
-                  }} 
-                  className="w-full py-3.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs uppercase tracking-widest shadow-lg shadow-indigo-600/30 transition cursor-pointer mt-2"
-                >
-                  Complete Registration
-                </button>
+                  {/* Create Password with Eye Show/Hide Toggle + Enterprise Checklist */}
+                  <div className="relative">
+                    <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">
+                      CREATE PASSWORD *
+                    </label>
+                    <div className="relative">
+                      <input
+                        type={showPassword ? 'text' : 'password'}
+                        required
+                        placeholder="Create a strong enterprise password"
+                        value={formData.password}
+                        onFocus={() => setIsPasswordFocused(true)}
+                        onBlur={() => setIsPasswordFocused(false)}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            password: e.target.value,
+                          })
+                        }
+                        className="w-full bg-slate-900 border border-slate-700 rounded-xl pl-4 pr-12 py-3.5 text-sm text-white outline-none focus:border-indigo-500 transition-colors"
+                      />
+
+                      <button
+                        type="button"
+                        tabIndex={-1}
+                        onClick={() => setShowPassword(!showPassword)}
+                        title={
+                          showPassword ? 'Hide password' : 'Show password'
+                        }
+                        className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white transition-colors p-1 cursor-pointer"
+                      >
+                        {showPassword ? (
+                          <svg
+                            className="w-5 h-5"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth="2"
+                              d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"
+                            />
+                          </svg>
+                        ) : (
+                          <svg
+                            className="w-5 h-5"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth="2"
+                              d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                            />
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth="2"
+                              d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+                            />
+                          </svg>
+                        )}
+                      </button>
+                    </div>
+
+                    {isPasswordFocused && (
+                      <div className="absolute left-0 top-[calc(100%+6px)] w-full bg-slate-950 border border-slate-700 p-3.5 rounded-xl shadow-2xl z-50 text-xs text-slate-300 space-y-1.5">
+                        <p className="font-bold text-white">
+                          Enterprise password requirements:
+                        </p>
+                        <p
+                          className={`flex items-center gap-2 ${
+                            /[A-Z]/.test(formData.password)
+                              ? 'text-emerald-400'
+                              : 'text-slate-400'
+                          }`}
+                        >
+                          <span>
+                            {/[A-Z]/.test(formData.password) ? '✓' : '•'}
+                          </span>{' '}
+                          At least one uppercase letter (A-Z)
+                        </p>
+                        <p
+                          className={`flex items-center gap-2 ${
+                            /[a-z]/.test(formData.password)
+                              ? 'text-emerald-400'
+                              : 'text-slate-400'
+                          }`}
+                        >
+                          <span>
+                            {/[a-z]/.test(formData.password) ? '✓' : '•'}
+                          </span>{' '}
+                          At least one lowercase letter (a-z)
+                        </p>
+                        <p
+                          className={`flex items-center gap-2 ${
+                            /\d/.test(formData.password)
+                              ? 'text-emerald-400'
+                              : 'text-slate-400'
+                          }`}
+                        >
+                          <span>
+                            {/\d/.test(formData.password) ? '✓' : '•'}
+                          </span>{' '}
+                          At least one number (0-9)
+                        </p>
+                        <p
+                          className={`flex items-center gap-2 ${
+                            /[\W_]/.test(formData.password)
+                              ? 'text-emerald-400'
+                              : 'text-slate-400'
+                          }`}
+                        >
+                          <span>
+                            {/[\W_]/.test(formData.password) ? '✓' : '•'}
+                          </span>{' '}
+                          At least one special character (!@#$%^&amp;*)
+                        </p>
+                        <p
+                          className={`flex items-center gap-2 ${
+                            formData.password.length >= 8
+                              ? 'text-emerald-400'
+                              : 'text-slate-400'
+                          }`}
+                        >
+                          <span>
+                            {formData.password.length >= 8 ? '✓' : '•'}
+                          </span>{' '}
+                          Minimum 8 characters
+                        </p>
+                      </div>
+                    )}
+                  </div>
+
+                  {formError && (
+                    <p className="text-red-400 text-xs font-bold bg-red-500/10 p-3 rounded-xl border border-red-500/20">
+                      {formError}
+                    </p>
+                  )}
+
+                  {renderEnterpriseButton({
+                    isLoading: loadingAction === 'step-1',
+                    idleText: 'CONTINUE',
+                    loadingText: 'VALIDATING CREDENTIALS...',
+                  })}
+                </form>
               </div>
-            </>
-          )}
+            )}
 
+            {step === 2 && (
+              /* STEP 2: COMPANY DETAILS */
+              <div>
+                <div className="flex items-start justify-between mb-6">
+                  <div>
+                    <h1 className="text-3xl font-extrabold tracking-tighter text-white">
+                      Company Details
+                    </h1>
+                    <p className="text-sm text-slate-400 font-medium mt-1">
+                      Complete your organization profile to activate your
+                      recruiter console.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setStep(1)}
+                    className="text-xs font-bold text-indigo-400 hover:underline mt-2 cursor-pointer"
+                  >
+                    &larr; Back
+                  </button>
+                </div>
+
+                <form
+                  noValidate
+                  onSubmit={handleFinalSubmit}
+                  className="space-y-4"
+                >
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-1.5">
+                        COMPANY NAME *
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="Enter company name"
+                        value={formData.companyName}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            companyName: e.target.value,
+                          })
+                        }
+                        className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-indigo-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-1.5">
+                        YOUR DESIGNATION *
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="Enter your designation"
+                        value={formData.designation}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            designation: e.target.value,
+                          })
+                        }
+                        className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-indigo-500"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-1.5">
+                        INDUSTRY TYPE *
+                      </label>
+                      <select
+                        value={formData.industry}
+                        onChange={(e) =>
+                          setFormData({ ...formData, industry: e.target.value })
+                        }
+                        className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-indigo-500 cursor-pointer"
+                      >
+                        <option value="Software Services">
+                          Software Services
+                        </option>
+                        <option value="IT Consulting">IT Consulting</option>
+                        <option value="FinTech & Banking">
+                          FinTech &amp; Banking
+                        </option>
+                        <option value="E-Commerce">E-Commerce</option>
+                        <option value="Healthcare">Healthcare</option>
+                        <option value="Manufacturing">Manufacturing</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-1.5">
+                        COMPANY SIZE *
+                      </label>
+                      <select
+                        value={formData.employees}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            employees: e.target.value,
+                          })
+                        }
+                        className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-indigo-500 cursor-pointer"
+                      >
+                        <option value="1-10">1 - 10 Employees</option>
+                        <option value="11-50">11 - 50 Employees</option>
+                        <option value="51-200">51 - 200 Employees</option>
+                        <option value="201-500">201 - 500 Employees</option>
+                        <option value="500+">500+ Employees</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-1.5">
+                        CITY *
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="Enter city"
+                        value={formData.city}
+                        onChange={(e) =>
+                          setFormData({ ...formData, city: e.target.value })
+                        }
+                        className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-indigo-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-1.5">
+                        STATE *
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="Enter state"
+                        value={formData.state}
+                        onChange={(e) =>
+                          setFormData({ ...formData, state: e.target.value })
+                        }
+                        className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-indigo-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-1.5">
+                        PINCODE *
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        maxLength={6}
+                        placeholder="6-digit pincode"
+                        value={formData.pincode}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            pincode: e.target.value.replace(/\D/g, ''),
+                          })
+                        }
+                        className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-indigo-500"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-1.5">
+                      PRIMARY ADDRESS *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="Building, street, and area"
+                      value={formData.address}
+                      onChange={(e) =>
+                        setFormData({ ...formData, address: e.target.value })
+                      }
+                      className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-indigo-500"
+                    />
+                  </div>
+
+                  {formError && (
+                    <p className="text-red-400 text-xs font-bold bg-red-500/10 p-3 rounded-xl border border-red-500/20">
+                      {formError}
+                    </p>
+                  )}
+
+                  {renderEnterpriseButton({
+                    isLoading: loadingAction === 'submit',
+                    idleText: 'COMPLETE REGISTRATION',
+                    loadingText: 'CREATING EMPLOYER ACCOUNT...',
+                  })}
+                </form>
+              </div>
+            )}
+          </div>
+
+          {/* Bottom Sign-In Link */}
+          <div className="mt-8 pt-6 border-t border-slate-800/70 text-center">
+            <p className="text-xs font-medium text-slate-400">
+              Already have an employer account?{' '}
+              <Link
+                href="/login"
+                className="text-white font-bold hover:underline"
+              >
+                Sign In
+              </Link>
+            </p>
+          </div>
         </div>
-
       </div>
-
-      {/* DYNAMIC EXISTING ACCOUNT MODAL WITH CLOSE (✕) BUTTON */}
-      {step === 'existing_modal' && (
-        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 z-[999999]">
-          <div className="bg-slate-900 border border-slate-700 rounded-3xl p-8 max-w-sm w-full text-center shadow-2xl relative animate-in fade-in duration-200">
-            
-            {/* Close Button */}
-            <button 
-              onClick={() => setStep('mobile')}
-              className="absolute top-4 right-4 w-8 h-8 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-700 transition cursor-pointer text-xs font-bold"
-            >
-              ✕
-            </button>
-
-            <div className="w-16 h-16 bg-indigo-500/10 border border-indigo-500/30 rounded-full flex items-center justify-center mx-auto mb-4 text-2xl">📱</div>
-            <h3 className="text-base font-bold text-white mb-2">+91 {mobile} is registered with</h3>
-            <p className="text-lg font-extrabold text-indigo-400 mb-6">{existingCompany}</p>
-
-            <button 
-              onClick={() => router.push('/login')}
-              className="w-full py-3.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs uppercase tracking-widest shadow-lg transition mb-4 cursor-pointer"
-            >
-              Log into existing account
-            </button>
-
-            <div className="relative my-4"><div className="absolute inset-0 flex items-center"><div className="w-full border-t border-slate-700"></div></div><div className="relative flex justify-center text-xs uppercase"><span className="bg-slate-900 px-2 text-slate-500">or</span></div></div>
-
-            <p className="text-[11px] text-slate-400 mb-4">Your number will be unlinked from {existingCompany} and linked to your new company.</p>
-
-            {/* CLICKING "CREATE NEW ACCOUNT" NOW LEADS TO THE OTP ENTERING PAGE */}
-            <button 
-              onClick={() => {
-                setOtp(['', '', '', '', '', '']);
-                setOtpError('');
-                setStep('otp');
-              }}
-              className="w-full py-3.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-600 font-bold text-xs uppercase tracking-widest transition cursor-pointer"
-            >
-              Create new account
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* TERMS & CONDITIONS MODAL OVERLAY */}
-      {step === 'terms_modal' && (
-        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 z-[999999]">
-          <div className="bg-slate-900 border border-slate-700 rounded-3xl p-8 max-w-2xl w-full shadow-2xl flex flex-col max-h-[85vh] animate-in fade-in duration-200">
-            <h3 className="text-2xl font-extrabold text-white mb-2">Terms & Conditions</h3>
-            <p className="text-xs text-slate-400 mb-4">Please review and accept our terms to complete your recruiter registration.</p>
-            
-            <div className="bg-slate-950 border border-slate-800 rounded-2xl p-6 overflow-y-auto text-xs text-slate-300 space-y-4 mb-6 flex-1 shadow-inner">
-              <p className="leading-relaxed">
-                We thank you for subscribing to Rolematch.com. For uninterrupted services, a superior user experience, and maintaining data security, it is important that there is a strict adherence to the Terms and conditions that govern usage of our services.
-              </p>
-              <div>
-                <strong className="text-indigo-400 block mb-1">1. Sharing of Rolematch.com account</strong>
-                <p>User cannot share their account login and password details with any individual. The same will be treated as a violation of our Terms & Conditions.</p>
-              </div>
-              <div>
-                <strong className="text-indigo-400 block mb-1">2. Sending NVite to non-relevant candidates</strong>
-                <p>Users should refrain from sending non-recruitment NVites to users outside the target audience. Violating this rule may result in your account being flagged as 'spam'.</p>
-              </div>
-              <div>
-                <strong className="text-indigo-400 block mb-1">3. Mass download of Resumes</strong>
-                <p>The facility to download resumes is provided as an aid to user's recruitment activities only. Any mass download of Resumes from the database using any kind of software is strictly prohibited.</p>
-              </div>
-              <div>
-                <strong className="text-indigo-400 block mb-1">4. Job postings for purposes other than Recruitment</strong>
-                <p>"Rolematch Job Postings" have the sole purpose of helping recruiters find candidates with more relevance and high intent.</p>
-              </div>
-              <div>
-                <strong className="text-indigo-400 block mb-1">5. Asking Jobseekers for money</strong>
-                <p>There should not be any activity or reference for money from the jobseekers for any direct/indirect favor or otherwise.</p>
-              </div>
-            </div>
-
-            {registerError && <p className="text-red-400 text-xs font-bold bg-red-500/10 p-3 rounded-lg border border-red-500/20 mb-4">{registerError}</p>}
-
-            <div className="flex gap-4">
-              <button 
-                type="button"
-                onClick={() => setStep('company_details')}
-                className="w-1/3 py-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs uppercase tracking-widest transition cursor-pointer"
-              >
-                Decline
-              </button>
-              <button 
-                type="button"
-                disabled={loading}
-                onClick={handleAcceptTermsAndRegister}
-                className="w-2/3 py-4 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs uppercase tracking-widest shadow-lg shadow-indigo-600/30 transition cursor-pointer"
-              >
-                {loading ? 'Saving Compliance...' : 'Accept & Complete Registration'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
     </div>
   );
 }

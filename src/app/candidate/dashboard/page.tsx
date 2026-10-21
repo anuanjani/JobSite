@@ -37,7 +37,6 @@ export default function CandidateDashboardPage() {
 
   const [jobs, setJobs] = useState<JobItem[]>([]);
   const [loadingJobs, setLoadingJobs] = useState(true);
-  const [showProfileModal, setShowProfileModal] = useState(false);
 
   useEffect(() => {
     const savedUser = localStorage.getItem('user');
@@ -59,7 +58,7 @@ export default function CandidateDashboardPage() {
                 setProfile({
                   name: data.name || parsed.name || '',
                   role: data.role || parsed.role || 'Candidate',
-                  headline: data.headline || data.designation || '',
+                  headline: data.designation || data.headline || '',
                   company: data.company || data.current_company || '',
                   location: data.location || data.city || '',
                   experience: data.experience || '',
@@ -154,12 +153,13 @@ export default function CandidateDashboardPage() {
               Last updated today
             </p>
 
-            <button
-              onClick={() => setShowProfileModal(true)}
-              className="mt-4 px-6 py-2 rounded-full bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs transition shadow-md cursor-pointer"
+            {/* DIRECT LINK TO /candidate/profile */}
+            <Link
+              href="/candidate/profile"
+              className="mt-4 px-6 py-2 rounded-full bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs transition shadow-md inline-block"
             >
               View profile
-            </button>
+            </Link>
           </div>
 
           {/* Profile Performance Box */}
@@ -462,10 +462,10 @@ export default function CandidateDashboardPage() {
                 access recruiter searches.
               </span>
               <Link
-                href="/jobs"
+                href="/candidate/profile"
                 className="text-blue-400 font-bold hover:underline shrink-0 ml-4"
               >
-                Explore &rarr;
+                Update Profile &rarr;
               </Link>
             </div>
           </div>
@@ -522,10 +522,10 @@ export default function CandidateDashboardPage() {
                 How your applies matched your profile in last 7 days?
               </h3>
               <Link
-                href="/jobs"
+                href="/candidate/profile"
                 className="text-xs font-bold text-blue-400 hover:text-blue-300"
               >
-                View all
+                Update Profile
               </Link>
             </div>
 
@@ -685,57 +685,6 @@ export default function CandidateDashboardPage() {
           </div>
         </aside>
       </div>
-
-      {/* Quick Profile Modal when clicking "View profile" */}
-      {showProfileModal && (
-        <div className="fixed inset-0 z-[999999] bg-slate-950/75 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-700 rounded-3xl max-w-lg w-full p-6 shadow-2xl">
-            <div className="flex items-center justify-between pb-4 border-b border-slate-800">
-              <h3 className="text-lg font-extrabold text-white">
-                Profile Summary
-              </h3>
-              <button
-                onClick={() => setShowProfileModal(false)}
-                className="w-8 h-8 rounded-full bg-slate-800 text-slate-400 hover:text-white flex items-center justify-center cursor-pointer"
-              >
-                ✕
-              </button>
-            </div>
-            <div className="py-5 space-y-3 text-sm">
-              <div>
-                <span className="text-xs text-slate-400 block">Full Name</span>
-                <span className="font-bold text-white">
-                  {profile.name || '—'}
-                </span>
-              </div>
-              <div>
-                <span className="text-xs text-slate-400 block">Email</span>
-                <span className="font-bold text-white">
-                  {profile.email || '—'}
-                </span>
-              </div>
-              <div>
-                <span className="text-xs text-slate-400 block">Role</span>
-                <span className="font-bold text-white">{profile.role}</span>
-              </div>
-            </div>
-            <div className="pt-4 border-t border-slate-800 flex justify-end gap-3">
-              <button
-                onClick={() => setShowProfileModal(false)}
-                className="px-4 py-2 rounded-xl bg-slate-800 text-xs font-bold text-slate-300 hover:text-white cursor-pointer"
-              >
-                Close
-              </button>
-              <Link
-                href="/settings"
-                className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-xs font-bold text-white"
-              >
-                Edit in Settings
-              </Link>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
