@@ -50,14 +50,32 @@ export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const employerEmail = searchParams.get('employerEmail');
+    const onlyActive = searchParams.get('onlyActive') === 'true';
+    const jobId = searchParams.get('id');
 
     const sql = neon(process.env.DATABASE_URL!);
     await ensureJobsColumns(sql);
+
+    if (jobId) {
+      const rows = await sql`
+        SELECT * FROM jobs WHERE id = ${Number(jobId)} LIMIT 1
+      `;
+      return NextResponse.json({ job: rows[0] || null });
+    }
 
     if (employerEmail) {
       const rows = await sql`
         SELECT * FROM jobs
         WHERE LOWER(TRIM(COALESCE(employer_email, ''))) = LOWER(TRIM(${employerEmail}))
+        ORDER BY id DESC
+      `;
+      return NextResponse.json({ jobs: rows });
+    }
+
+    if (onlyActive) {
+      const rows = await sql`
+        SELECT * FROM jobs
+        WHERE COALESCE(UPPER(TRIM(status)), 'ACTIVE') = 'ACTIVE'
         ORDER BY id DESC
       `;
       return NextResponse.json({ jobs: rows });
@@ -230,7 +248,6 @@ export async function DELETE(request: Request) {
     const jobId = Number(id);
     const sql = neon(process.env.DATABASE_URL!);
 
-    // Clean up any dependent applications or saved jobs first
     try {
       await sql`DELETE FROM job_applications WHERE job_id = ${jobId}`;
     } catch {}

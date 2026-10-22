@@ -1,3 +1,7 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
 @keyframes backdropFadeIn {
   from {
     opacity: 0;
@@ -18,7 +22,7 @@
   }
 }
 
-/* Automatically animate all modal backdrops and popup cards across the app */
+/* Smooth entrance animation for all modal backdrops and popup cards */
 .fixed.inset-0.backdrop-blur-sm,
 .fixed.inset-0.backdrop-blur-md {
   animation: backdropFadeIn 0.2s ease-out forwards;
@@ -27,4 +31,22 @@
 .fixed.inset-0.backdrop-blur-sm > div,
 .fixed.inset-0.backdrop-blur-md > div {
   animation: modalPopIn 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Show top-right (✕) close button ONLY when the mouse is inside the card/frame across the entire app */
+.fixed.inset-0 > div > button.absolute,
+.fixed.inset-0 > div > a.absolute,
+div.shadow-2xl > a.absolute,
+div.shadow-2xl > button.absolute {
+  opacity: 0 !important;
+  pointer-events: none !important;
+  transition: opacity 0.2s ease-in-out, background-color 0.2s ease-in-out, color 0.2s ease-in-out, transform 0.2s ease-in-out !important;
+}
+
+.fixed.inset-0 > div:hover > button.absolute,
+.fixed.inset-0 > div:hover > a.absolute,
+div.shadow-2xl:hover > a.absolute,
+div.shadow-2xl:hover > button.absolute {
+  opacity: 1 !important;
+  pointer-events: auto !important;
 }

@@ -4,22 +4,38 @@ import Link from 'next/link';
 
 interface EmploymentItem {
   id: string;
-  designation: string;
+  isCurrentEmployment: 'Yes' | 'No';
+  employmentType: 'Full-time' | 'Internship' | string;
+  totalExpYears: string;
+  totalExpMonths: string;
   company: string;
-  employmentType: string;
-  startDate: string;
-  endDate: string;
-  noticePeriod: string;
+  designation: string;
+  joiningYear: string;
+  joiningMonth: string;
+  workedTillYear?: string;
+  workedTillMonth?: string;
+  currency?: string;
+  salary: string;
+  skillsUsed: string;
   description: string;
-  topSkills: string;
+  noticePeriod: string;
+  startDate?: string;
+  endDate?: string;
+  topSkills?: string;
 }
 
 interface EducationItem {
   id: string;
-  degree: string;
+  educationLevel?: string;
   institute: string;
-  yearRange: string;
+  course?: string;
+  specialization?: string;
   courseType: string;
+  startYear?: string;
+  endYear?: string;
+  gradingSystem?: string;
+  degree: string;
+  yearRange: string;
 }
 
 interface ItSkillItem {
@@ -27,6 +43,8 @@ interface ItSkillItem {
   skill: string;
   version: string;
   lastUsed: string;
+  expYears?: string;
+  expMonths?: string;
   experience: string;
 }
 
@@ -42,9 +60,28 @@ interface ProjectItem {
 interface AccomplishmentEntry {
   id: string;
   title: string;
-  subtitle: string;
   url: string;
-  validity: string;
+  description?: string;
+  durationFromYear?: string;
+  durationFromMonth?: string;
+  durationToYear?: string;
+  durationToMonth?: string;
+  currentlyWorking?: boolean;
+  publishedYear?: string;
+  publishedMonth?: string;
+  patentOffice?: string;
+  patentStatus?: 'Patent issued' | 'Patent pending';
+  applicationNumber?: string;
+  issueYear?: string;
+  issueMonth?: string;
+  completionId?: string;
+  validityFromMonth?: string;
+  validityFromYear?: string;
+  validityToMonth?: string;
+  validityToYear?: string;
+  doesNotExpire?: boolean;
+  subtitle?: string;
+  validity?: string;
 }
 
 interface LanguageItem {
@@ -56,11 +93,207 @@ interface LanguageItem {
   speak: boolean;
 }
 
+interface CareerProfileData {
+  currentIndustry: string;
+  department: string;
+  roleCategory: string;
+  jobRole: string;
+  desiredJobTypes?: string[];
+  desiredEmploymentTypes?: string[];
+  desiredJobType: string;
+  desiredEmploymentType: string;
+  preferredJobRole: string;
+  preferredLocations: string;
+  preferredSalaryCurrency?: string;
+  preferredSalary: string;
+  preferredShift: string;
+}
+
+interface PersonalDetailsData {
+  gender: string;
+  moreInfo?: string[];
+  maritalStatus: string;
+  dobDay?: string;
+  dobMonth?: string;
+  dobYear?: string;
+  dateOfBirth: string;
+  category: string;
+  workPermitUsa?: string;
+  workPermitCountries?: string[];
+  workPermit: string;
+  address: string;
+  hometown?: string;
+  pincode: string;
+}
+
 const INPUT_CLASS =
   'w-full bg-slate-950/90 border border-slate-700/90 rounded-xl px-4 py-3.5 text-sm text-white placeholder:text-slate-500 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all';
 
-const LABEL_CLASS =
-  'block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2.5';
+const LABEL_CLASS = 'block text-xs font-bold text-slate-200 mb-2';
+
+const MONTHS_LIST = [
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'May',
+  'Jun',
+  'Jul',
+  'Aug',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dec',
+];
+
+const DAYS_LIST = Array.from({ length: 31 }, (_, i) =>
+  String(i + 1).padStart(2, '0')
+);
+const YEARS_LIST = Array.from({ length: 45 }, (_, i) => String(2026 - i));
+const DOB_YEARS_LIST = Array.from({ length: 65 }, (_, i) => String(2008 - i));
+const EDU_YEARS_LIST = Array.from({ length: 50 }, (_, i) => String(2030 - i));
+const CERT_YEARS_LIST = Array.from({ length: 55 }, (_, i) => String(2035 - i));
+
+const EDUCATION_LEVELS = [
+  'Doctorate/PhD',
+  'Masters/Post-Graduation',
+  'Graduation/Diploma',
+  '12th',
+  '10th',
+];
+
+const COURSE_OPTIONS = [
+  'B.Tech/B.E.',
+  'BCA',
+  'B.Sc',
+  'B.Com',
+  'B.A',
+  'BBA/BMS',
+  'M.Tech',
+  'MCA',
+  'MBA/PGDM',
+  'M.Sc',
+  'M.Com',
+  'M.A',
+  'Ph.D/Doctorate',
+  'Diploma',
+  'Class XII',
+  'Class X',
+  'Other',
+];
+
+const SPECIALIZATION_OPTIONS = [
+  'Computer Science',
+  'Information Technology',
+  'Electronics and Telecommunication',
+  'Electrical',
+  'Mechanical',
+  'Civil',
+  'Artificial Intelligence & Machine Learning',
+  'Data Science',
+  'Finance',
+  'Marketing',
+  'Human Resources',
+  'Operations',
+  'Science',
+  'Commerce',
+  'Arts',
+  'Other',
+];
+
+const GRADING_SYSTEM_OPTIONS = [
+  'Scale 10 Grading System',
+  'Scale 4 Grading System',
+  '% Marks of 100 Maximum',
+  'Course Requires a Pass',
+];
+
+const INDUSTRY_OPTIONS = [
+  'Software Product',
+  'IT Services & Consulting',
+  'Banking / Financial Services',
+  'FinTech / Payments',
+  'E-Commerce / Internet',
+  'Telecom / ISP',
+  'Healthcare & Life Sciences',
+  'Education / EdTech',
+  'Automobile / Manufacturing',
+  'Other',
+];
+
+const DEPARTMENT_OPTIONS = [
+  'Engineering - Software & QA',
+  'Data Science & Analytics',
+  'Product Management',
+  'IT & Information Security',
+  'Project & Program Management',
+  'UX, Design & Architecture',
+  'Customer Success, Service & Operations',
+  'Sales & Business Development',
+  'Human Resources',
+  'Finance & Accounting',
+  'Other',
+];
+
+const ROLE_CATEGORY_OPTIONS = [
+  'Quality Assurance and Testing',
+  'Software Development',
+  'DevOps / Cloud Engineering',
+  'DBA / Data Warehousing',
+  'Business Intelligence & Analytics',
+  'Engineering Management',
+  'IT Support',
+  'Other',
+];
+
+const JOB_ROLE_OPTIONS = [
+  'QA Team Manager',
+  'Test Lead',
+  'Automation Test Engineer',
+  'Quality Assurance / Quality Control Executive',
+  'Software Developer / Engineer',
+  'Full Stack Developer',
+  'Backend Developer',
+  'Frontend Developer',
+  'DevOps Engineer',
+  'Engineering Manager',
+  'Project Manager - IT / Software',
+  'Product Manager',
+  'Other',
+];
+
+const COUNTRIES_LIST = [
+  'India',
+  'United States (USA)',
+  'United Kingdom (UK)',
+  'Singapore',
+  'United Arab Emirates (UAE)',
+  'Canada',
+  'Australia',
+  'Germany',
+  'Saudi Arabia',
+  'Japan',
+  'Netherlands',
+];
+
+const LANGUAGE_OPTIONS = [
+  'English',
+  'Hindi',
+  'Kannada',
+  'Tamil',
+  'Telugu',
+  'Malayalam',
+  'Marathi',
+  'Bengali',
+  'Gujarati',
+  'Punjabi',
+  'Odia',
+  'Urdu',
+  'French',
+  'German',
+  'Spanish',
+  'Japanese',
+];
 
 // Format any date or ISO string to local system time: YYYY-MM-DD HH:mm
 function formatLocalTimestamp(raw?: string): string {
@@ -82,7 +315,7 @@ export default function CandidateProfilePage() {
   const [toast, setToast] = useState('');
   const [activeSectionId, setActiveSectionId] = useState('resume');
 
-  // Core Profile State (No hardcoded location or company values)
+  // Core Profile State
   const [profile, setProfile] = useState({
     name: '',
     email: '',
@@ -119,22 +352,32 @@ export default function CandidateProfilePage() {
       department: '',
       roleCategory: '',
       jobRole: '',
+      desiredJobTypes: ['Permanent'],
+      desiredEmploymentTypes: ['Full time'],
       desiredJobType: 'Permanent',
       desiredEmploymentType: 'Full Time',
       preferredJobRole: '',
       preferredLocations: '',
-      preferredSalary: '',
+      preferredSalaryCurrency: '₹',
+      preferredSalary: '0',
       preferredShift: 'Day',
-    },
+    } as CareerProfileData,
     personalDetails: {
       gender: '',
+      moreInfo: [],
       maritalStatus: '',
+      dobDay: '',
+      dobMonth: '',
+      dobYear: '',
       dateOfBirth: '',
       category: '',
+      workPermitUsa: '',
+      workPermitCountries: ['India'],
       workPermit: 'India',
       address: '',
+      hometown: '',
       pincode: '',
-    },
+    } as PersonalDetailsData,
     languages: [] as LanguageItem[],
     diversity: {
       disabilityStatus: 'Do not have disability',
@@ -143,7 +386,7 @@ export default function CandidateProfilePage() {
     },
   });
 
-  // Active Modal Editor State
+  // Active Modal State
   const [activeModal, setActiveModal] = useState<
     | null
     | 'basic'
@@ -157,11 +400,10 @@ export default function CandidateProfilePage() {
     | 'accomplishment'
     | 'career'
     | 'personal'
-    | 'language'
     | 'diversity'
   >(null);
 
-  // Temporary Drafts for Modals
+  // Modal Drafts
   const [basicDraft, setBasicDraft] = useState({
     name: '',
     designation: '',
@@ -178,33 +420,63 @@ export default function CandidateProfilePage() {
   const [skillsDraft, setSkillsDraft] = useState<string[]>([]);
   const [newSkillInput, setNewSkillInput] = useState('');
 
-  const [empDraft, setEmpDraft] = useState<EmploymentItem>({
+  const createEmptyEmpDraft = (): EmploymentItem => ({
     id: '',
-    designation: '',
-    company: '',
+    isCurrentEmployment: 'Yes',
     employmentType: 'Full-time',
-    startDate: '',
-    endDate: '',
-    noticePeriod: '',
+    totalExpYears: '',
+    totalExpMonths: '',
+    company: '',
+    designation: '',
+    joiningYear: '',
+    joiningMonth: '',
+    workedTillYear: '',
+    workedTillMonth: '',
+    currency: '₹',
+    salary: '',
+    skillsUsed: '',
     description: '',
-    topSkills: '',
+    noticePeriod: '',
   });
 
-  const [eduDraft, setEduDraft] = useState<EducationItem>({
+  const [empDraft, setEmpDraft] = useState<EmploymentItem>(
+    createEmptyEmpDraft()
+  );
+  const [empError, setEmpError] = useState('');
+
+  const createEmptyEduDraft = (level = ''): EducationItem => ({
     id: '',
-    degree: '',
+    educationLevel: level,
     institute: '',
+    course: '',
+    specialization: '',
+    courseType: 'Full time',
+    startYear: '',
+    endYear: '',
+    gradingSystem: '',
+    degree: '',
     yearRange: '',
-    courseType: 'Full Time',
   });
 
-  const [itSkillDraft, setItSkillDraft] = useState<ItSkillItem>({
+  const [eduDraft, setEduDraft] = useState<EducationItem>(
+    createEmptyEduDraft()
+  );
+  const [eduError, setEduError] = useState('');
+
+  const createEmptyItSkillDraft = (): ItSkillItem => ({
     id: '',
     skill: '',
     version: '',
     lastUsed: '',
-    experience: '',
+    expYears: '0 Year',
+    expMonths: '0 Month',
+    experience: '0 Year 0 Month',
   });
+
+  const [itSkillDraft, setItSkillDraft] = useState<ItSkillItem>(
+    createEmptyItSkillDraft()
+  );
+  const [itSkillError, setItSkillError] = useState('');
 
   const [projectDraft, setProjectDraft] = useState<ProjectItem>({
     id: '',
@@ -215,6 +487,7 @@ export default function CandidateProfilePage() {
     details: '',
   });
 
+  // Accomplishment Category & Draft States
   const [accompCategory, setAccompCategory] = useState<
     | 'onlineProfiles'
     | 'workSamples'
@@ -222,28 +495,55 @@ export default function CandidateProfilePage() {
     | 'presentations'
     | 'patents'
     | 'certifications'
-  >('certifications');
-  const [accompDraft, setAccompDraft] = useState<AccomplishmentEntry>({
+  >('onlineProfiles');
+
+  const createEmptyAccompDraft = (): AccomplishmentEntry => ({
     id: '',
     title: '',
-    subtitle: '',
     url: '',
+    description: '',
+    durationFromYear: '',
+    durationFromMonth: '',
+    durationToYear: '',
+    durationToMonth: '',
+    currentlyWorking: false,
+    publishedYear: '',
+    publishedMonth: '',
+    patentOffice: '',
+    patentStatus: 'Patent issued',
+    applicationNumber: '',
+    issueYear: '',
+    issueMonth: '',
+    completionId: '',
+    validityFromMonth: '',
+    validityFromYear: '',
+    validityToMonth: '',
+    validityToYear: '',
+    doesNotExpire: false,
+    subtitle: '',
     validity: '',
   });
 
-  const [careerDraft, setCareerDraft] = useState(profile.careerProfile);
-  const [personalDraft, setPersonalDraft] = useState(profile.personalDetails);
-  const [languageDraft, setLanguageDraft] = useState<LanguageItem>({
-    id: '',
-    language: '',
-    proficiency: 'Expert',
-    read: true,
-    write: true,
-    speak: true,
-  });
+  const [accompDraft, setAccompDraft] = useState<AccomplishmentEntry>(
+    createEmptyAccompDraft()
+  );
+  const [accompError, setAccompError] = useState('');
+
+  // Career Profile Draft State
+  const [careerDraft, setCareerDraft] = useState<CareerProfileData>(
+    profile.careerProfile
+  );
+  const [careerError, setCareerError] = useState('');
+
+  // Personal Details + Language Proficiency Draft States
+  const [personalDraft, setPersonalDraft] = useState<PersonalDetailsData>(
+    profile.personalDetails
+  );
+  const [languagesDraft, setLanguagesDraft] = useState<LanguageItem[]>([]);
+
+  // Diversity & Inclusion Draft State
   const [diversityDraft, setDiversityDraft] = useState(profile.diversity);
 
-  // Sync changes immediately with Header & Side Drawer
   const broadcastProfileUpdate = (updated: {
     name?: string;
     avatar?: string;
@@ -269,7 +569,6 @@ export default function CandidateProfilePage() {
     } catch {}
   };
 
-  // Load Candidate Profile from Neon DB
   useEffect(() => {
     const savedUser = localStorage.getItem('user');
     if (!savedUser) {
@@ -318,14 +617,12 @@ export default function CandidateProfilePage() {
               itSkills: Array.isArray(data.itSkills) ? data.itSkills : [],
               projects: Array.isArray(data.projects) ? data.projects : [],
               accomplishments: {
-                onlineProfiles:
-                  data.accomplishments?.onlineProfiles || [],
+                onlineProfiles: data.accomplishments?.onlineProfiles || [],
                 workSamples: data.accomplishments?.workSamples || [],
                 publications: data.accomplishments?.publications || [],
                 presentations: data.accomplishments?.presentations || [],
                 patents: data.accomplishments?.patents || [],
-                certifications:
-                  data.accomplishments?.certifications || [],
+                certifications: data.accomplishments?.certifications || [],
               },
               careerProfile: {
                 ...prev.careerProfile,
@@ -355,7 +652,6 @@ export default function CandidateProfilePage() {
     setTimeout(() => setToast(''), 3000);
   };
 
-  // Generic Save Helper to Persist to Neon DB & UploadThing
   const saveToDatabase = async (
     updatedState: typeof profile,
     extraPayload: Record<string, any> = {},
@@ -385,7 +681,6 @@ export default function CandidateProfilePage() {
         };
         setProfile(nextState);
 
-        // Immediately sync Header pill & Side Drawer
         broadcastProfileUpdate({
           name: nextState.name,
           avatar: finalAvatar,
@@ -403,7 +698,6 @@ export default function CandidateProfilePage() {
     }
   };
 
-  // File Upload Handlers (Resume & Avatar)
   const handleResumeUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || !e.target.files[0]) return;
     const file = e.target.files[0];
@@ -443,8 +737,6 @@ export default function CandidateProfilePage() {
     reader.onload = () => {
       if (typeof reader.result === 'string') {
         const previewDataUrl = reader.result;
-
-        // 1. Instant UI reflection on Profile card, Top-Right Header, and Side Drawer
         const optimisticState = {
           ...profile,
           avatar: previewDataUrl,
@@ -457,7 +749,6 @@ export default function CandidateProfilePage() {
           headline: profile.designation || profile.headline,
         });
 
-        // 2. Persist to UploadThing & Neon DB in background
         saveToDatabase(
           optimisticState,
           {
@@ -469,6 +760,617 @@ export default function CandidateProfilePage() {
       }
     };
     reader.readAsDataURL(file);
+  };
+
+  // Employment Modal Openers
+  const openAddEmploymentModal = () => {
+    setEmpError('');
+    setEmpDraft(createEmptyEmpDraft());
+    setActiveModal('employment');
+  };
+
+  const openEditEmploymentModal = (emp: EmploymentItem) => {
+    setEmpError('');
+    setEmpDraft({
+      id: emp.id,
+      isCurrentEmployment: emp.isCurrentEmployment || 'Yes',
+      employmentType: emp.employmentType || 'Full-time',
+      totalExpYears: emp.totalExpYears || '',
+      totalExpMonths: emp.totalExpMonths || '',
+      company: emp.company || '',
+      designation: emp.designation || '',
+      joiningYear: emp.joiningYear || '',
+      joiningMonth: emp.joiningMonth || '',
+      workedTillYear: emp.workedTillYear || '',
+      workedTillMonth: emp.workedTillMonth || '',
+      currency: emp.currency || '₹',
+      salary: emp.salary || '',
+      skillsUsed: emp.skillsUsed || emp.topSkills || '',
+      description: emp.description || '',
+      noticePeriod: emp.noticePeriod || '',
+    });
+    setActiveModal('employment');
+  };
+
+  const handleWriteWithAi = () => {
+    const role = empDraft.designation.trim() || 'Professional';
+    const org = empDraft.company.trim() || 'the organization';
+    const skills = empDraft.skillsUsed.trim();
+    const generated = `Working as ${role} at ${org}. Responsible for end-to-end delivery, cross-functional collaboration, and driving measurable quality and performance improvements${
+      skills ? ` utilizing ${skills}` : ''
+    }.`;
+    setEmpDraft((prev) => ({
+      ...prev,
+      description: generated.slice(0, 4000),
+    }));
+  };
+
+  const handleSaveEmployment = (e: React.FormEvent) => {
+    e.preventDefault();
+    setEmpError('');
+
+    if (
+      empDraft.totalExpYears === '' ||
+      empDraft.totalExpMonths === '' ||
+      !empDraft.company.trim() ||
+      !empDraft.designation.trim() ||
+      !empDraft.joiningYear ||
+      !empDraft.joiningMonth ||
+      (empDraft.isCurrentEmployment === 'Yes' &&
+        (!empDraft.salary.trim() ||
+          !empDraft.skillsUsed.trim() ||
+          !empDraft.noticePeriod))
+    ) {
+      setEmpError('Please fill in all mandatory (*) employment fields.');
+      return;
+    }
+
+    const startDateStr = `${empDraft.joiningMonth} ${empDraft.joiningYear}`;
+    const endDateStr =
+      empDraft.isCurrentEmployment === 'Yes'
+        ? 'Present'
+        : empDraft.workedTillMonth && empDraft.workedTillYear
+        ? `${empDraft.workedTillMonth} ${empDraft.workedTillYear}`
+        : 'Past';
+
+    const entry: EmploymentItem = {
+      ...empDraft,
+      id: empDraft.id || String(Date.now()),
+      startDate: startDateStr,
+      endDate: endDateStr,
+      topSkills: empDraft.skillsUsed,
+    };
+
+    const exists = profile.employmentList.some((i) => i.id === entry.id);
+    const nextList = exists
+      ? profile.employmentList.map((i) => (i.id === entry.id ? entry : i))
+      : [entry, ...profile.employmentList];
+
+    const isCurrent = entry.isCurrentEmployment === 'Yes';
+    const formattedExp = `${entry.totalExpYears} ${
+      Number(entry.totalExpYears) === 1 ? 'Year' : 'Years'
+    }${
+      Number(entry.totalExpMonths) > 0
+        ? ` ${entry.totalExpMonths} ${
+            Number(entry.totalExpMonths) === 1 ? 'Month' : 'Months'
+          }`
+        : ''
+    }`;
+
+    saveToDatabase(
+      {
+        ...profile,
+        designation: isCurrent
+          ? entry.designation
+          : profile.designation || entry.designation,
+        company: isCurrent ? entry.company : profile.company || entry.company,
+        experience: isCurrent
+          ? formattedExp
+          : profile.experience || formattedExp,
+        salary:
+          isCurrent && entry.salary
+            ? `${entry.currency || '₹'} ${entry.salary}`
+            : profile.salary,
+        noticePeriod:
+          isCurrent && entry.noticePeriod
+            ? entry.noticePeriod
+            : profile.noticePeriod,
+        employmentList: nextList,
+      },
+      {},
+      exists ? 'Employment updated!' : 'Employment added!'
+    );
+  };
+
+  // Education Modal Openers & Save Handler
+  const openAddEducationModal = (presetLevel = '') => {
+    setEduError('');
+    setEduDraft(createEmptyEduDraft(presetLevel));
+    setActiveModal('education');
+  };
+
+  const openEditEducationModal = (edu: EducationItem) => {
+    setEduError('');
+    const [parsedStart = '', parsedEnd = ''] = (edu.yearRange || '').split('-');
+    setEduDraft({
+      id: edu.id,
+      educationLevel: edu.educationLevel || 'Graduation/Diploma',
+      institute: edu.institute || '',
+      course: edu.course || edu.degree || '',
+      specialization: edu.specialization || '',
+      courseType: edu.courseType || 'Full time',
+      startYear: edu.startYear || parsedStart.trim(),
+      endYear: edu.endYear || parsedEnd.trim(),
+      gradingSystem: edu.gradingSystem || '',
+      degree: edu.degree || '',
+      yearRange: edu.yearRange || '',
+    });
+    setActiveModal('education');
+  };
+
+  const handleSaveEducation = (e: React.FormEvent) => {
+    e.preventDefault();
+    setEduError('');
+
+    if (
+      !eduDraft.educationLevel ||
+      !eduDraft.institute.trim() ||
+      !eduDraft.course ||
+      !eduDraft.specialization ||
+      !eduDraft.courseType ||
+      !eduDraft.startYear ||
+      !eduDraft.endYear
+    ) {
+      setEduError('Please fill in all mandatory (*) education fields.');
+      return;
+    }
+
+    const computedDegree = `${eduDraft.course}${
+      eduDraft.specialization ? ` ${eduDraft.specialization}` : ''
+    }`;
+    const computedYears = `${eduDraft.startYear}-${eduDraft.endYear}`;
+
+    const entry: EducationItem = {
+      ...eduDraft,
+      id: eduDraft.id || String(Date.now()),
+      degree: computedDegree,
+      yearRange: computedYears,
+    };
+
+    const exists = profile.educationList.some((i) => i.id === entry.id);
+    const nextList = exists
+      ? profile.educationList.map((i) => (i.id === entry.id ? entry : i))
+      : [...profile.educationList, entry];
+
+    saveToDatabase(
+      { ...profile, educationList: nextList },
+      {},
+      exists ? 'Education updated!' : 'Education added!'
+    );
+  };
+
+  // IT Skills Modal Openers & Save Handler
+  const openAddItSkillModal = () => {
+    setItSkillError('');
+    setItSkillDraft(createEmptyItSkillDraft());
+    setActiveModal('itSkill');
+  };
+
+  const openEditItSkillModal = (item: ItSkillItem) => {
+    setItSkillError('');
+    let parsedYears = item.expYears || '0 Year';
+    let parsedMonths = item.expMonths || '0 Month';
+
+    if (!item.expYears && item.experience) {
+      const yrMatch = item.experience.match(/(\d+\s*Years?)/i);
+      const moMatch = item.experience.match(/(\d+\s*Months?)/i);
+      if (yrMatch) parsedYears = yrMatch[1];
+      if (moMatch) parsedMonths = moMatch[1];
+    }
+
+    setItSkillDraft({
+      id: item.id,
+      skill: item.skill || '',
+      version: item.version === '-' ? '' : item.version || '',
+      lastUsed: item.lastUsed === '-' ? '' : item.lastUsed || '',
+      expYears: parsedYears,
+      expMonths: parsedMonths,
+      experience: item.experience || `${parsedYears} ${parsedMonths}`,
+    });
+    setActiveModal('itSkill');
+  };
+
+  const handleSaveItSkill = (e: React.FormEvent) => {
+    e.preventDefault();
+    setItSkillError('');
+
+    if (!itSkillDraft.skill.trim()) {
+      setItSkillError('Please enter a Skill / software name.');
+      return;
+    }
+
+    const yrs = itSkillDraft.expYears || '0 Year';
+    const mos = itSkillDraft.expMonths || '0 Month';
+    const combinedExp = `${yrs} ${mos}`;
+
+    const entry: ItSkillItem = {
+      id: itSkillDraft.id || String(Date.now()),
+      skill: itSkillDraft.skill.trim(),
+      version: itSkillDraft.version.trim() || '-',
+      lastUsed: itSkillDraft.lastUsed || '-',
+      expYears: yrs,
+      expMonths: mos,
+      experience: combinedExp,
+    };
+
+    const exists = profile.itSkills.some((i) => i.id === entry.id);
+    const nextList = exists
+      ? profile.itSkills.map((i) => (i.id === entry.id ? entry : i))
+      : [...profile.itSkills, entry];
+
+    saveToDatabase(
+      { ...profile, itSkills: nextList },
+      {},
+      exists ? 'IT skill updated!' : 'IT skill added!'
+    );
+  };
+
+  const handleDeleteCurrentItSkill = () => {
+    if (!itSkillDraft.id) return;
+    const filtered = profile.itSkills.filter((s) => s.id !== itSkillDraft.id);
+    saveToDatabase({ ...profile, itSkills: filtered }, {}, 'IT skill deleted');
+  };
+
+  // Accomplishment Modal Openers & Save Handler
+  const openAddAccomplishmentModal = (
+    category:
+      | 'onlineProfiles'
+      | 'workSamples'
+      | 'publications'
+      | 'presentations'
+      | 'patents'
+      | 'certifications'
+  ) => {
+    setAccompError('');
+    setAccompCategory(category);
+    setAccompDraft(createEmptyAccompDraft());
+    setActiveModal('accomplishment');
+  };
+
+  const openEditAccomplishmentModal = (
+    category:
+      | 'onlineProfiles'
+      | 'workSamples'
+      | 'publications'
+      | 'presentations'
+      | 'patents'
+      | 'certifications',
+    entry: AccomplishmentEntry
+  ) => {
+    setAccompError('');
+    setAccompCategory(category);
+    setAccompDraft({
+      ...createEmptyAccompDraft(),
+      ...entry,
+      description: entry.description || entry.subtitle || '',
+    });
+    setActiveModal('accomplishment');
+  };
+
+  const handleSaveAccomplishment = (e: React.FormEvent) => {
+    e.preventDefault();
+    setAccompError('');
+
+    const titleVal = accompDraft.title.trim();
+    const urlVal = accompDraft.url.trim();
+
+    if (accompCategory === 'onlineProfiles') {
+      if (!titleVal || !urlVal) {
+        setAccompError('Social profile and URL are mandatory.');
+        return;
+      }
+    } else if (accompCategory === 'workSamples') {
+      if (!titleVal || !urlVal) {
+        setAccompError('Work title and URL are mandatory.');
+        return;
+      }
+    } else if (accompCategory === 'publications') {
+      if (!titleVal || !urlVal) {
+        setAccompError('Title and URL are mandatory.');
+        return;
+      }
+    } else if (accompCategory === 'presentations') {
+      if (!titleVal || !urlVal) {
+        setAccompError('Presentation title and URL are mandatory.');
+        return;
+      }
+    } else if (accompCategory === 'patents') {
+      if (!titleVal || !urlVal) {
+        setAccompError('Patent title and URL are mandatory.');
+        return;
+      }
+    } else if (accompCategory === 'certifications') {
+      if (!titleVal) {
+        setAccompError('Certification name is mandatory.');
+        return;
+      }
+    }
+
+    let computedValidity = '';
+    let computedSubtitle = accompDraft.description?.trim() || '';
+
+    if (accompCategory === 'workSamples') {
+      const fromPart = [
+        accompDraft.durationFromMonth,
+        accompDraft.durationFromYear,
+      ]
+        .filter(Boolean)
+        .join(' ');
+      const toPart = accompDraft.currentlyWorking
+        ? 'Present'
+        : [accompDraft.durationToMonth, accompDraft.durationToYear]
+            .filter(Boolean)
+            .join(' ');
+      if (fromPart || toPart) {
+        computedValidity = `Duration: ${fromPart || '—'} to ${toPart || '—'}`;
+      }
+    } else if (accompCategory === 'publications') {
+      const pubPart = [accompDraft.publishedMonth, accompDraft.publishedYear]
+        .filter(Boolean)
+        .join(' ');
+      if (pubPart) {
+        computedValidity = `Published on: ${pubPart}`;
+      }
+    } else if (accompCategory === 'patents') {
+      const metaParts = [
+        accompDraft.patentOffice
+          ? `Office: ${accompDraft.patentOffice}`
+          : '',
+        accompDraft.applicationNumber
+          ? `App No: ${accompDraft.applicationNumber}`
+          : '',
+        accompDraft.patentStatus || '',
+      ].filter(Boolean);
+      const issuePart = [accompDraft.issueMonth, accompDraft.issueYear]
+        .filter(Boolean)
+        .join(' ');
+      if (issuePart) metaParts.push(`Issued: ${issuePart}`);
+      computedValidity = metaParts.join(' | ');
+    } else if (accompCategory === 'certifications') {
+      if (accompDraft.completionId?.trim()) {
+        computedSubtitle = `Completion ID: ${accompDraft.completionId.trim()}`;
+      }
+      const fromStr = [
+        accompDraft.validityFromMonth,
+        accompDraft.validityFromYear,
+      ]
+        .filter(Boolean)
+        .join(' ');
+      const toStr = [accompDraft.validityToMonth, accompDraft.validityToYear]
+        .filter(Boolean)
+        .join(' ');
+      if (accompDraft.doesNotExpire) {
+        computedValidity = fromStr
+          ? `Valid from ${fromStr}. Does not expire.`
+          : 'Does not expire.';
+      } else if (fromStr || toStr) {
+        computedValidity = `Validity: ${fromStr || '—'} to ${toStr || '—'}`;
+      }
+    }
+
+    const entry: AccomplishmentEntry = {
+      ...accompDraft,
+      id: accompDraft.id || String(Date.now()),
+      title: titleVal,
+      url: urlVal,
+      subtitle: computedSubtitle,
+      validity: computedValidity,
+    };
+
+    const currentList = profile.accomplishments[accompCategory] || [];
+    const exists = currentList.some((i) => i.id === entry.id);
+    const nextList = exists
+      ? currentList.map((i) => (i.id === entry.id ? entry : i))
+      : [...currentList, entry];
+
+    saveToDatabase(
+      {
+        ...profile,
+        accomplishments: {
+          ...profile.accomplishments,
+          [accompCategory]: nextList,
+        },
+      },
+      {},
+      exists ? 'Accomplishment updated!' : 'Accomplishment added!'
+    );
+  };
+
+  // Career Profile Modal Opener & Save Handler
+  const openCareerModal = () => {
+    setCareerError('');
+    const cp = profile.careerProfile;
+    const jobTypes = Array.isArray(cp.desiredJobTypes)
+      ? cp.desiredJobTypes
+      : cp.desiredJobType
+      ? cp.desiredJobType.split(',').map((s) => s.trim()).filter(Boolean)
+      : ['Permanent'];
+    const empTypes = Array.isArray(cp.desiredEmploymentTypes)
+      ? cp.desiredEmploymentTypes
+      : cp.desiredEmploymentType
+      ? cp.desiredEmploymentType.split(',').map((s) => s.trim()).filter(Boolean)
+      : ['Full time'];
+
+    const rawSalary = String(cp.preferredSalary || '0').replace(/^[₹$]\s*/, '');
+
+    setCareerDraft({
+      currentIndustry: cp.currentIndustry || '',
+      department: cp.department || '',
+      roleCategory: cp.roleCategory || '',
+      jobRole: cp.jobRole || '',
+      desiredJobTypes: jobTypes,
+      desiredEmploymentTypes: empTypes,
+      desiredJobType: jobTypes.join(', '),
+      desiredEmploymentType: empTypes.join(', '),
+      preferredJobRole: cp.preferredJobRole || '',
+      preferredLocations: cp.preferredLocations || '',
+      preferredSalaryCurrency: cp.preferredSalaryCurrency || '₹',
+      preferredSalary: rawSalary,
+      preferredShift: cp.preferredShift || 'Day',
+    });
+    setActiveModal('career');
+  };
+
+  const handleSaveCareerProfile = (e: React.FormEvent) => {
+    e.preventDefault();
+    setCareerError('');
+
+    if (
+      !careerDraft.currentIndustry ||
+      !careerDraft.department ||
+      !careerDraft.roleCategory ||
+      !careerDraft.jobRole
+    ) {
+      setCareerError(
+        'Current industry, Department, Role category, and Job role are mandatory.'
+      );
+      return;
+    }
+
+    const curr = careerDraft.preferredSalaryCurrency || '₹';
+    const rawSal = careerDraft.preferredSalary.trim() || '0';
+    const formattedSalary =
+      rawSal.startsWith('₹') || rawSal.startsWith('$')
+        ? rawSal
+        : `${curr}${rawSal}`;
+
+    const updatedCareer: CareerProfileData = {
+      ...careerDraft,
+      desiredJobType: (careerDraft.desiredJobTypes || []).join(', ') || 'Permanent',
+      desiredEmploymentType:
+        (careerDraft.desiredEmploymentTypes || []).join(', ') || 'Full time',
+      preferredSalary: formattedSalary,
+    };
+
+    saveToDatabase(
+      { ...profile, careerProfile: updatedCareer },
+      {},
+      'Career profile updated!'
+    );
+  };
+
+  // Personal Details + Language Proficiency Modal Opener & Save Handler
+  const openPersonalModal = (addBlankLanguageRow = false) => {
+    const pd = profile.personalDetails;
+    let dDay = pd.dobDay || '';
+    let dMonth = pd.dobMonth || '';
+    let dYear = pd.dobYear || '';
+
+    if ((!dDay || !dMonth || !dYear) && pd.dateOfBirth) {
+      const parts = pd.dateOfBirth.trim().split(/\s+/);
+      if (parts.length === 3) {
+        dDay = parts[0];
+        dMonth = parts[1];
+        dYear = parts[2];
+      }
+    }
+
+    const countries = Array.isArray(pd.workPermitCountries)
+      ? pd.workPermitCountries
+      : pd.workPermit
+      ? pd.workPermit.split(',').map((s) => s.trim()).filter(Boolean)
+      : ['India'];
+
+    setPersonalDraft({
+      gender: pd.gender || '',
+      moreInfo: Array.isArray(pd.moreInfo) ? pd.moreInfo : [],
+      maritalStatus: pd.maritalStatus || '',
+      dobDay: dDay,
+      dobMonth: dMonth,
+      dobYear: dYear,
+      dateOfBirth: pd.dateOfBirth || '',
+      category: pd.category || '',
+      workPermitUsa: pd.workPermitUsa || '',
+      workPermitCountries: countries,
+      workPermit: countries.join(', ') || 'India',
+      address: pd.address || '',
+      hometown: pd.hometown || '',
+      pincode: pd.pincode || '',
+    });
+
+    const existingLangs =
+      profile.languages.length > 0
+        ? profile.languages.map((l) => ({ ...l }))
+        : [
+            {
+              id: String(Date.now()),
+              language: '',
+              proficiency: '',
+              read: false,
+              write: false,
+              speak: false,
+            },
+          ];
+
+    if (addBlankLanguageRow && profile.languages.length > 0) {
+      existingLangs.push({
+        id: String(Date.now() + 1),
+        language: '',
+        proficiency: '',
+        read: false,
+        write: false,
+        speak: false,
+      });
+    }
+
+    setLanguagesDraft(existingLangs);
+    setActiveModal('personal');
+  };
+
+  const handleSavePersonalDetails = (e: React.FormEvent) => {
+    e.preventDefault();
+
+    const dobFormatted =
+      personalDraft.dobDay && personalDraft.dobMonth && personalDraft.dobYear
+        ? `${personalDraft.dobDay} ${personalDraft.dobMonth} ${personalDraft.dobYear}`
+        : personalDraft.dateOfBirth || '';
+
+    const workPermitStr = [
+      ...(personalDraft.workPermitCountries || []),
+      personalDraft.workPermitUsa ? `USA (${personalDraft.workPermitUsa})` : '',
+    ]
+      .filter(Boolean)
+      .join(', ');
+
+    const fullAddress = [
+      personalDraft.address?.trim(),
+      personalDraft.hometown?.trim(),
+      personalDraft.pincode?.trim(),
+    ]
+      .filter(Boolean)
+      .join(', ');
+
+    const validLanguages = languagesDraft
+      .filter((l) => l.language.trim() !== '')
+      .map((l) => ({
+        ...l,
+        proficiency: l.proficiency || 'Expert',
+      }));
+
+    saveToDatabase(
+      {
+        ...profile,
+        personalDetails: {
+          ...personalDraft,
+          dateOfBirth: dobFormatted,
+          workPermit: workPermitStr || 'India',
+          address: personalDraft.address?.trim() || fullAddress,
+        },
+        languages: validLanguages,
+      },
+      {},
+      'Personal details updated!'
+    );
   };
 
   const scrollToSection = (id: string) => {
@@ -492,35 +1394,13 @@ export default function CandidateProfilePage() {
       id: 'employment',
       label: 'Employment',
       actionLabel: 'Add',
-      onAction: () => {
-        setEmpDraft({
-          id: '',
-          designation: '',
-          company: '',
-          employmentType: 'Full-time',
-          startDate: '',
-          endDate: '',
-          noticePeriod: '',
-          description: '',
-          topSkills: '',
-        });
-        setActiveModal('employment');
-      },
+      onAction: openAddEmploymentModal,
     },
     {
       id: 'education',
       label: 'Education',
       actionLabel: 'Add',
-      onAction: () => {
-        setEduDraft({
-          id: '',
-          degree: '',
-          institute: '',
-          yearRange: '',
-          courseType: 'Full Time',
-        });
-        setActiveModal('education');
-      },
+      onAction: () => openAddEducationModal(),
     },
     { id: 'it-skills', label: 'IT skills' },
     {
@@ -545,13 +1425,13 @@ export default function CandidateProfilePage() {
     { id: 'personal-details', label: 'Personal details' },
   ];
 
-  // Reusable Modal Action Footer (Only Save button; top-right ✕ closes popup)
+  // Single Save button in footer (top-right ✕ closes popup when hovered)
   const renderModalFooter = (saveLabel = 'Save') => (
     <div className="pt-6 mt-8 border-t border-slate-800/90 flex items-center justify-end">
       <button
         type="submit"
         disabled={saving}
-        className="relative overflow-hidden px-8 py-3 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:bg-blue-600/60 text-xs font-extrabold text-white transition shadow-lg shadow-blue-600/25 cursor-pointer"
+        className="relative overflow-hidden px-8 py-3 rounded-full bg-blue-600 hover:bg-blue-500 disabled:bg-blue-600/60 text-xs font-extrabold text-white transition shadow-lg shadow-blue-600/25 cursor-pointer"
       >
         {saving && (
           <div
@@ -565,6 +1445,14 @@ export default function CandidateProfilePage() {
       </button>
     </div>
   );
+
+  // Reusable Pill Option Button
+  const pillButtonClass = (selected: boolean) =>
+    `px-4 py-2 rounded-full border text-xs font-semibold transition-all cursor-pointer ${
+      selected
+        ? 'bg-blue-600/20 border-blue-500 text-white shadow-sm'
+        : 'bg-slate-950/80 border-slate-700/90 text-slate-300 hover:border-slate-500 hover:text-white'
+    }`;
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 font-sans py-8 px-4 sm:px-8 md:px-12">
@@ -589,7 +1477,6 @@ export default function CandidateProfilePage() {
         }
       `}</style>
 
-      {/* Floating Save Toast */}
       {toast && (
         <div
           className="fixed bottom-6 right-6 z-[9999999] bg-emerald-600 text-white px-5 py-3.5 rounded-2xl shadow-2xl text-xs font-extrabold flex items-center gap-2.5"
@@ -603,12 +1490,9 @@ export default function CandidateProfilePage() {
       )}
 
       <div className="max-w-6xl mx-auto space-y-6">
-        {/* ================================================================
-            TOP CANDIDATE HEADER CARD
-           ================================================================ */}
+        {/* TOP CANDIDATE HEADER CARD */}
         <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl">
           <div className="flex flex-col md:flex-row items-start md:items-center gap-6 md:gap-8">
-            {/* Left Circular Avatar with Green 100% Ring & Photo Upload */}
             <div className="relative w-28 h-28 shrink-0 flex items-center justify-center mx-auto md:mx-0 group">
               <svg
                 className="absolute inset-0 w-full h-full -rotate-90 pointer-events-none"
@@ -665,7 +1549,6 @@ export default function CandidateProfilePage() {
               </span>
             </div>
 
-            {/* Right Identity & 2-Column Info Grid */}
             <div className="flex-1 w-full">
               <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2 pb-5 border-b border-slate-800">
                 <div>
@@ -717,7 +1600,6 @@ export default function CandidateProfilePage() {
                 </span>
               </div>
 
-              {/* 2-Column Metadata Grid */}
               <div className="pt-5 grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs text-slate-300">
                 <div className="space-y-2.5">
                   <div className="flex items-center gap-2.5">
@@ -744,10 +1626,7 @@ export default function CandidateProfilePage() {
                     <span className="text-slate-400">📞</span>
                     <span>{profile.phone || 'Add mobile number'}</span>
                     {profile.phone && (
-                      <span
-                        className="w-4 h-4 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-[10px] font-bold"
-                        title="Verified"
-                      >
+                      <span className="w-4 h-4 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-[10px] font-bold">
                         ✓
                       </span>
                     )}
@@ -756,10 +1635,7 @@ export default function CandidateProfilePage() {
                     <span className="text-slate-400">✉️</span>
                     <span className="truncate">{profile.email}</span>
                     {profile.email && (
-                      <span
-                        className="w-4 h-4 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-[10px] font-bold shrink-0"
-                        title="Verified"
-                      >
+                      <span className="w-4 h-4 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-[10px] font-bold shrink-0">
                         ✓
                       </span>
                     )}
@@ -774,11 +1650,8 @@ export default function CandidateProfilePage() {
           </div>
         </div>
 
-        {/* ================================================================
-            MAIN 2-COLUMN BODY: LEFT QUICK LINKS + RIGHT SECTIONS
-           ================================================================ */}
+        {/* MAIN 2-COLUMN BODY */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-          {/* LEFT STICKY QUICK LINKS SIDEBAR */}
           <aside className="lg:col-span-3 bg-slate-900 border border-slate-800 rounded-3xl p-6 lg:sticky lg:top-24 shadow-xl">
             <h2 className="text-base font-extrabold text-white mb-4 px-2">
               Quick links
@@ -814,9 +1687,8 @@ export default function CandidateProfilePage() {
             </ul>
           </aside>
 
-          {/* RIGHT MAIN CONTENT CARDS */}
           <div className="lg:col-span-9 space-y-6">
-            {/* PRO KEYWORD INSIGHTS BANNER */}
+            {/* PRO BANNER */}
             <div className="rounded-3xl bg-gradient-to-r from-amber-500/15 via-slate-900 to-slate-900 border border-amber-500/30 px-6 py-4 flex flex-wrap items-center justify-between gap-4 shadow-lg">
               <div className="flex items-center gap-4">
                 <span className="text-xl font-extrabold text-amber-400 flex items-center gap-1">
@@ -840,7 +1712,7 @@ export default function CandidateProfilePage() {
               </div>
             </div>
 
-            {/* 1. RESUME SECTION */}
+            {/* 1. RESUME */}
             <section
               id="resume"
               className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-7 shadow-xl scroll-mt-24"
@@ -848,7 +1720,6 @@ export default function CandidateProfilePage() {
               <h3 className="text-base font-extrabold text-white mb-4">
                 Resume
               </h3>
-
               {profile.resumeName ? (
                 <div className="flex items-center justify-between gap-4 mb-5">
                   <div>
@@ -856,8 +1727,7 @@ export default function CandidateProfilePage() {
                       {profile.resumeName}
                     </p>
                     <p className="text-xs text-slate-400 mt-0.5">
-                      Uploaded on{' '}
-                      {formatLocalTimestamp(profile.resumeUpdatedAt)}
+                      Uploaded on {formatLocalTimestamp(profile.resumeUpdatedAt)}
                     </p>
                   </div>
                   <div className="flex items-center gap-2.5">
@@ -912,7 +1782,7 @@ export default function CandidateProfilePage() {
               </div>
             </section>
 
-            {/* 2. RESUME HEADLINE SECTION */}
+            {/* 2. RESUME HEADLINE */}
             <section
               id="headline"
               className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-7 shadow-xl scroll-mt-24"
@@ -928,7 +1798,6 @@ export default function CandidateProfilePage() {
                     setActiveModal('headline');
                   }}
                   className="text-slate-400 hover:text-blue-400 cursor-pointer text-sm"
-                  title="Edit Resume Headline"
                 >
                   ✎
                 </button>
@@ -939,7 +1808,7 @@ export default function CandidateProfilePage() {
               </p>
             </section>
 
-            {/* 3. KEY SKILLS SECTION */}
+            {/* 3. KEY SKILLS */}
             <section
               id="key-skills"
               className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-7 shadow-xl scroll-mt-24"
@@ -956,12 +1825,10 @@ export default function CandidateProfilePage() {
                     setActiveModal('skills');
                   }}
                   className="text-slate-400 hover:text-blue-400 cursor-pointer text-sm"
-                  title="Edit Key Skills"
                 >
                   ✎
                 </button>
               </div>
-
               {profile.skills.length > 0 ? (
                 <div className="flex flex-wrap gap-2.5">
                   {profile.skills.map((skill, idx) => (
@@ -992,20 +1859,7 @@ export default function CandidateProfilePage() {
                 </h3>
                 <button
                   type="button"
-                  onClick={() => {
-                    setEmpDraft({
-                      id: '',
-                      designation: '',
-                      company: '',
-                      employmentType: 'Full-time',
-                      startDate: '',
-                      endDate: '',
-                      noticePeriod: '',
-                      description: '',
-                      topSkills: '',
-                    });
-                    setActiveModal('employment');
-                  }}
+                  onClick={openAddEmploymentModal}
                   className="text-xs font-extrabold text-blue-400 hover:text-blue-300 cursor-pointer"
                 >
                   Add employment
@@ -1014,69 +1868,97 @@ export default function CandidateProfilePage() {
 
               {profile.employmentList.length > 0 ? (
                 <div className="space-y-6 divide-y divide-slate-800">
-                  {profile.employmentList.map((emp) => (
-                    <div key={emp.id} className="pt-5 first:pt-0">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <h4 className="text-sm font-extrabold text-white">
-                            {emp.designation}
-                          </h4>
+                  {profile.employmentList.map((emp) => {
+                    const startLabel =
+                      emp.joiningMonth && emp.joiningYear
+                        ? `${emp.joiningMonth} ${emp.joiningYear}`
+                        : emp.startDate || '';
+                    const endLabel =
+                      emp.isCurrentEmployment === 'Yes'
+                        ? 'Present'
+                        : emp.workedTillMonth && emp.workedTillYear
+                        ? `${emp.workedTillMonth} ${emp.workedTillYear}`
+                        : emp.endDate || 'Present';
+                    const durationLabel =
+                      emp.totalExpYears !== undefined &&
+                      emp.totalExpYears !== ''
+                        ? `(${emp.totalExpYears} ${
+                            Number(emp.totalExpYears) === 1 ? 'year' : 'years'
+                          }${
+                            emp.totalExpMonths && Number(emp.totalExpMonths) > 0
+                              ? ` ${emp.totalExpMonths} ${
+                                  Number(emp.totalExpMonths) === 1
+                                    ? 'month'
+                                    : 'months'
+                                }`
+                              : ''
+                          })`
+                        : '';
+                    const skillsDisplay = emp.skillsUsed || emp.topSkills || '';
+
+                    return (
+                      <div key={emp.id} className="pt-5 first:pt-0">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <h4 className="text-sm font-extrabold text-white">
+                              {emp.designation}
+                            </h4>
+                            <button
+                              type="button"
+                              onClick={() => openEditEmploymentModal(emp)}
+                              className="text-slate-400 hover:text-blue-400 cursor-pointer text-xs"
+                              title="Edit Employment"
+                            >
+                              ✎
+                            </button>
+                          </div>
                           <button
                             type="button"
                             onClick={() => {
-                              setEmpDraft(emp);
-                              setActiveModal('employment');
+                              const filtered = profile.employmentList.filter(
+                                (item) => item.id !== emp.id
+                              );
+                              saveToDatabase(
+                                { ...profile, employmentList: filtered },
+                                {},
+                                'Employment entry removed'
+                              );
                             }}
-                            className="text-slate-400 hover:text-blue-400 cursor-pointer text-xs"
+                            className="text-[11px] text-slate-500 hover:text-red-400 cursor-pointer"
                           >
-                            ✎
+                            Delete
                           </button>
                         </div>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const filtered = profile.employmentList.filter(
-                              (item) => item.id !== emp.id
-                            );
-                            saveToDatabase(
-                              { ...profile, employmentList: filtered },
-                              {},
-                              'Employment entry removed'
-                            );
-                          }}
-                          className="text-[11px] text-slate-500 hover:text-red-400 cursor-pointer"
-                        >
-                          Delete
-                        </button>
-                      </div>
-                      <p className="text-xs font-bold text-slate-200 mt-0.5">
-                        {emp.company}
-                      </p>
-                      <p className="text-xs text-slate-400 mt-0.5">
-                        {emp.employmentType}
-                        {emp.startDate ? ` | ${emp.startDate}` : ''}
-                        {emp.endDate ? ` to ${emp.endDate}` : ''}
-                      </p>
-                      {emp.noticePeriod && (
+
+                        <p className="text-xs font-bold text-slate-200 mt-0.5">
+                          {emp.company}
+                        </p>
                         <p className="text-xs text-slate-400 mt-0.5">
-                          {emp.noticePeriod}
+                          {emp.employmentType || 'Full-time'}
+                          {startLabel ? ` | ${startLabel} to ${endLabel}` : ''}
+                          {durationLabel ? ` ${durationLabel}` : ''}
                         </p>
-                      )}
-                      {emp.description && (
-                        <p className="text-xs text-slate-300 mt-2 leading-relaxed">
-                          {emp.description}
-                        </p>
-                      )}
-                      {emp.topSkills && (
-                        <p className="text-xs text-slate-300 mt-2">
-                          <strong className="text-white">
-                            Top 5 key skills:
-                          </strong>{' '}
-                          {emp.topSkills}
-                        </p>
-                      )}
-                    </div>
-                  ))}
+                        {emp.noticePeriod && (
+                          <p className="text-xs text-slate-400 mt-0.5">
+                            {emp.noticePeriod}
+                          </p>
+                        )}
+                        {emp.description && (
+                          <p className="text-xs text-slate-300 mt-2 leading-relaxed whitespace-pre-line">
+                            {emp.description}
+                          </p>
+                        )}
+                        {skillsDisplay && (
+                          <p className="text-xs text-slate-300 mt-2">
+                            <strong className="text-white">
+                              Top key skills:
+                            </strong>{' '}
+                            {skillsDisplay}
+                          </p>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               ) : (
                 <p className="text-xs text-slate-400">
@@ -1097,16 +1979,7 @@ export default function CandidateProfilePage() {
                 </h3>
                 <button
                   type="button"
-                  onClick={() => {
-                    setEduDraft({
-                      id: '',
-                      degree: '',
-                      institute: '',
-                      yearRange: '',
-                      courseType: 'Full Time',
-                    });
-                    setActiveModal('education');
-                  }}
+                  onClick={() => openAddEducationModal()}
                   className="text-xs font-extrabold text-blue-400 hover:text-blue-300 cursor-pointer"
                 >
                   Add education
@@ -1123,15 +1996,14 @@ export default function CandidateProfilePage() {
                       <div>
                         <div className="flex items-center gap-2">
                           <h4 className="text-sm font-extrabold text-white">
-                            {edu.degree}
+                            {edu.degree ||
+                              `${edu.course || ''} ${edu.specialization || ''}`}
                           </h4>
                           <button
                             type="button"
-                            onClick={() => {
-                              setEduDraft(edu);
-                              setActiveModal('education');
-                            }}
+                            onClick={() => openEditEducationModal(edu)}
                             className="text-slate-400 hover:text-blue-400 cursor-pointer text-xs"
+                            title="Edit Education"
                           >
                             ✎
                           </button>
@@ -1140,7 +2012,10 @@ export default function CandidateProfilePage() {
                           {edu.institute}
                         </p>
                         <p className="text-xs text-slate-400 mt-0.5">
-                          {edu.yearRange}
+                          {edu.yearRange ||
+                            (edu.startYear && edu.endYear
+                              ? `${edu.startYear}-${edu.endYear}`
+                              : '')}
                           {edu.courseType ? ` | ${edu.courseType}` : ''}
                         </p>
                       </div>
@@ -1172,32 +2047,16 @@ export default function CandidateProfilePage() {
               <div className="mt-5 pt-4 border-t border-slate-800/80 flex flex-col items-start gap-2.5">
                 <button
                   type="button"
-                  onClick={() => {
-                    setEduDraft({
-                      id: '',
-                      degree: '',
-                      institute: '',
-                      yearRange: '',
-                      courseType: 'Full Time',
-                    });
-                    setActiveModal('education');
-                  }}
+                  onClick={() => openAddEducationModal('Doctorate/PhD')}
                   className="text-xs font-extrabold text-blue-400 hover:underline cursor-pointer"
                 >
                   Add doctorate/PhD
                 </button>
                 <button
                   type="button"
-                  onClick={() => {
-                    setEduDraft({
-                      id: '',
-                      degree: '',
-                      institute: '',
-                      yearRange: '',
-                      courseType: 'Full Time',
-                    });
-                    setActiveModal('education');
-                  }}
+                  onClick={() =>
+                    openAddEducationModal('Masters/Post-Graduation')
+                  }
                   className="text-xs font-extrabold text-blue-400 hover:underline cursor-pointer"
                 >
                   Add masters/post-graduation
@@ -1216,16 +2075,7 @@ export default function CandidateProfilePage() {
                 </h3>
                 <button
                   type="button"
-                  onClick={() => {
-                    setItSkillDraft({
-                      id: '',
-                      skill: '',
-                      version: '',
-                      lastUsed: '',
-                      experience: '',
-                    });
-                    setActiveModal('itSkill');
-                  }}
+                  onClick={openAddItSkillModal}
                   className="text-xs font-extrabold text-blue-400 hover:text-blue-300 cursor-pointer"
                 >
                   Add details
@@ -1251,34 +2101,16 @@ export default function CandidateProfilePage() {
                           <td className="py-3 pr-4">{item.version || '-'}</td>
                           <td className="py-3 pr-4">{item.lastUsed || '-'}</td>
                           <td className="py-3 pr-4">
-                            {item.experience || '-'}
+                            {item.experience || '0 Year 0 Month'}
                           </td>
                           <td className="py-3 text-right whitespace-nowrap">
                             <button
                               type="button"
-                              onClick={() => {
-                                setItSkillDraft(item);
-                                setActiveModal('itSkill');
-                              }}
-                              className="text-slate-400 hover:text-blue-400 mr-3 cursor-pointer"
+                              onClick={() => openEditItSkillModal(item)}
+                              className="text-slate-400 hover:text-blue-400 cursor-pointer"
+                              title="Edit IT Skill"
                             >
                               ✎
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const filtered = profile.itSkills.filter(
-                                  (s) => s.id !== item.id
-                                );
-                                saveToDatabase(
-                                  { ...profile, itSkills: filtered },
-                                  {},
-                                  'IT skill removed'
-                                );
-                              }}
-                              className="text-slate-500 hover:text-red-400 cursor-pointer"
-                            >
-                              ✕
                             </button>
                           </td>
                         </tr>
@@ -1294,7 +2126,7 @@ export default function CandidateProfilePage() {
               )}
             </section>
 
-            {/* 7. PROJECTS SECTION */}
+            {/* 7. PROJECTS */}
             <section
               id="projects"
               className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-7 shadow-xl scroll-mt-24"
@@ -1385,7 +2217,7 @@ export default function CandidateProfilePage() {
               )}
             </section>
 
-            {/* 8. PROFILE SUMMARY SECTION */}
+            {/* 8. PROFILE SUMMARY */}
             <section
               id="profile-summary"
               className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-7 shadow-xl scroll-mt-24"
@@ -1401,7 +2233,6 @@ export default function CandidateProfilePage() {
                     setActiveModal('summary');
                   }}
                   className="text-slate-400 hover:text-blue-400 cursor-pointer text-sm"
-                  title="Edit Profile Summary"
                 >
                   ✎
                 </button>
@@ -1420,19 +2251,18 @@ export default function CandidateProfilePage() {
               <h3 className="text-base font-extrabold text-white mb-5">
                 Accomplishments
               </h3>
-
               <div className="divide-y divide-slate-800 space-y-5">
                 {(
                   [
                     {
                       key: 'onlineProfiles',
                       title: 'Online profile',
-                      desc: 'Add link to online professional profiles',
+                      desc: 'Add link to online professional profiles (e.g. LinkedIn, etc.)',
                     },
                     {
                       key: 'workSamples',
                       title: 'Work sample',
-                      desc: 'Link relevant work samples',
+                      desc: 'Link relevant work samples (e.g. Github, Behance)',
                     },
                     {
                       key: 'publications',
@@ -1443,7 +2273,7 @@ export default function CandidateProfilePage() {
                     {
                       key: 'presentations',
                       title: 'Presentation',
-                      desc: 'Add links to your online presentations',
+                      desc: 'Add links to your online presentations (e.g. Slide-share presentation links etc.)',
                     },
                     {
                       key: 'patents',
@@ -1471,17 +2301,7 @@ export default function CandidateProfilePage() {
                         </div>
                         <button
                           type="button"
-                          onClick={() => {
-                            setAccompCategory(sec.key);
-                            setAccompDraft({
-                              id: '',
-                              title: '',
-                              subtitle: '',
-                              url: '',
-                              validity: '',
-                            });
-                            setActiveModal('accomplishment');
-                          }}
+                          onClick={() => openAddAccomplishmentModal(sec.key)}
                           className="text-xs font-extrabold text-blue-400 hover:text-blue-300 cursor-pointer shrink-0"
                         >
                           Add
@@ -1496,7 +2316,7 @@ export default function CandidateProfilePage() {
                               className="flex items-start gap-3.5 bg-slate-800/40 border border-slate-800 p-3.5 rounded-2xl"
                             >
                               <div className="w-9 h-9 rounded-xl bg-red-500/15 border border-red-500/30 text-red-400 font-extrabold text-sm flex items-center justify-center shrink-0">
-                                {entry.title?.charAt(0)?.toUpperCase() || 'C'}
+                                {entry.title?.charAt(0)?.toUpperCase() || 'A'}
                               </div>
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-center justify-between gap-2">
@@ -1506,12 +2326,14 @@ export default function CandidateProfilePage() {
                                     </h5>
                                     <button
                                       type="button"
-                                      onClick={() => {
-                                        setAccompCategory(sec.key);
-                                        setAccompDraft(entry);
-                                        setActiveModal('accomplishment');
-                                      }}
+                                      onClick={() =>
+                                        openEditAccomplishmentModal(
+                                          sec.key,
+                                          entry
+                                        )
+                                      }
                                       className="text-slate-400 hover:text-blue-400 cursor-pointer text-xs"
+                                      title="Edit"
                                     >
                                       ✎
                                     </button>
@@ -1539,11 +2361,6 @@ export default function CandidateProfilePage() {
                                     Delete
                                   </button>
                                 </div>
-                                {entry.subtitle && (
-                                  <p className="text-xs text-slate-300 mt-0.5">
-                                    {entry.subtitle}
-                                  </p>
-                                )}
                                 {entry.url && (
                                   <a
                                     href={entry.url}
@@ -1559,6 +2376,11 @@ export default function CandidateProfilePage() {
                                     {entry.validity}
                                   </p>
                                 )}
+                                {(entry.description || entry.subtitle) && (
+                                  <p className="text-xs text-slate-300 mt-1 leading-relaxed whitespace-pre-line">
+                                    {entry.description || entry.subtitle}
+                                  </p>
+                                )}
                               </div>
                             </div>
                           ))}
@@ -1570,7 +2392,7 @@ export default function CandidateProfilePage() {
               </div>
             </section>
 
-            {/* 10. CAREER PROFILE SECTION */}
+            {/* 10. CAREER PROFILE */}
             <section
               id="career-profile"
               className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-7 shadow-xl scroll-mt-24"
@@ -1581,11 +2403,9 @@ export default function CandidateProfilePage() {
                 </h3>
                 <button
                   type="button"
-                  onClick={() => {
-                    setCareerDraft({ ...profile.careerProfile });
-                    setActiveModal('career');
-                  }}
+                  onClick={openCareerModal}
                   className="text-slate-400 hover:text-blue-400 cursor-pointer text-sm"
+                  title="Edit Career Profile"
                 >
                   ✎
                 </button>
@@ -1659,7 +2479,7 @@ export default function CandidateProfilePage() {
                     Preferred annual salary
                   </span>
                   <span className="font-extrabold text-white">
-                    {profile.careerProfile.preferredSalary || 'Add salary'}
+                    {profile.careerProfile.preferredSalary || '₹0'}
                   </span>
                 </div>
                 <div>
@@ -1673,7 +2493,7 @@ export default function CandidateProfilePage() {
               </div>
             </section>
 
-            {/* 11. PERSONAL DETAILS & LANGUAGES SECTION */}
+            {/* 11. PERSONAL DETAILS & LANGUAGES */}
             <section
               id="personal-details"
               className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-7 shadow-xl scroll-mt-24"
@@ -1684,11 +2504,9 @@ export default function CandidateProfilePage() {
                 </h3>
                 <button
                   type="button"
-                  onClick={() => {
-                    setPersonalDraft({ ...profile.personalDetails });
-                    setActiveModal('personal');
-                  }}
+                  onClick={() => openPersonalModal(false)}
                   className="text-slate-400 hover:text-blue-400 cursor-pointer text-sm"
+                  title="Edit Personal Details"
                 >
                   ✎
                 </button>
@@ -1701,6 +2519,7 @@ export default function CandidateProfilePage() {
                     {[
                       profile.personalDetails.gender,
                       profile.personalDetails.maritalStatus,
+                      ...(profile.personalDetails.moreInfo || []),
                     ]
                       .filter(Boolean)
                       .join(', ') || 'Add gender & marital status'}
@@ -1723,7 +2542,13 @@ export default function CandidateProfilePage() {
                 <div>
                   <span className="text-slate-400 block mb-1">Address</span>
                   <span className="font-extrabold text-white leading-relaxed">
-                    {profile.personalDetails.address || 'Add permanent address'}
+                    {[
+                      profile.personalDetails.address,
+                      profile.personalDetails.hometown,
+                      profile.personalDetails.pincode,
+                    ]
+                      .filter(Boolean)
+                      .join(', ') || 'Add permanent address'}
                   </span>
                 </div>
                 <div>
@@ -1734,7 +2559,6 @@ export default function CandidateProfilePage() {
                 </div>
               </div>
 
-              {/* Languages Sub-Section */}
               <div className="pt-6">
                 <div className="flex items-center justify-between mb-4">
                   <h4 className="text-sm font-extrabold text-white">
@@ -1742,17 +2566,7 @@ export default function CandidateProfilePage() {
                   </h4>
                   <button
                     type="button"
-                    onClick={() => {
-                      setLanguageDraft({
-                        id: '',
-                        language: '',
-                        proficiency: 'Expert',
-                        read: true,
-                        write: true,
-                        speak: true,
-                      });
-                      setActiveModal('language');
-                    }}
+                    onClick={() => openPersonalModal(true)}
                     className="text-xs font-extrabold text-blue-400 hover:text-blue-300 cursor-pointer"
                   >
                     Add languages
@@ -1825,12 +2639,11 @@ export default function CandidateProfilePage() {
               </div>
             </section>
 
-            {/* 12. DIVERSITY & INCLUSION SECTION */}
+            {/* 12. DIVERSITY & INCLUSION */}
             <section className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-7 shadow-xl relative overflow-hidden">
               <span className="absolute top-0 right-6 px-3 py-1 rounded-b-xl bg-indigo-500/20 border-x border-b border-indigo-500/30 text-[10px] font-extrabold text-indigo-300">
                 New
               </span>
-
               <div className="flex items-center gap-2.5 mb-1">
                 <h3 className="text-base font-extrabold text-white">
                   Diversity &amp; inclusion
@@ -1842,6 +2655,7 @@ export default function CandidateProfilePage() {
                     setActiveModal('diversity');
                   }}
                   className="text-slate-400 hover:text-blue-400 cursor-pointer text-sm"
+                  title="Edit Diversity & Inclusion"
                 >
                   ✎
                 </button>
@@ -1850,7 +2664,6 @@ export default function CandidateProfilePage() {
                 Share details to attract recruiters who value people from
                 different backgrounds
               </p>
-
               <div className="space-y-4 text-xs">
                 <div>
                   <span className="text-slate-400 block mb-0.5">
@@ -1883,7 +2696,7 @@ export default function CandidateProfilePage() {
       </div>
 
       {/* =====================================================================
-          SPACIOUS, ANIMATED EDIT MODALS (NO HARDCODED VALUES, NO BOTTOM CANCEL)
+          ANIMATED POPUP MODALS (Top-Right ✕ Visible Only When Mouse Is Inside Card)
          ===================================================================== */}
       {activeModal && (
         <div
@@ -1892,18 +2705,18 @@ export default function CandidateProfilePage() {
           onClick={() => setActiveModal(null)}
         >
           <div
-            className="bg-slate-900 border border-slate-700/80 rounded-[2rem] max-w-2xl w-full max-h-[90vh] overflow-y-auto p-8 sm:p-10 shadow-[0_25px_70px_-15px_rgba(0,0,0,0.85)] relative"
+            className="group bg-slate-900 border border-slate-700/80 rounded-[2rem] max-w-2xl w-full max-h-[90vh] overflow-y-auto p-8 sm:p-10 shadow-[0_25px_70px_-15px_rgba(0,0,0,0.85)] relative"
             style={{
               animation:
                 'modalPopIn 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards',
             }}
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Single Top-Right Close Button (✕) */}
+            {/* Top-Right Close Button (✕) — Hidden until cursor enters the modal card */}
             <button
               type="button"
               onClick={() => setActiveModal(null)}
-              className="absolute top-7 right-7 w-10 h-10 rounded-full bg-slate-800/90 border border-slate-700 text-slate-400 hover:text-white hover:bg-slate-700 flex items-center justify-center cursor-pointer transition-all"
+              className="opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto absolute top-7 right-7 w-10 h-10 rounded-full bg-slate-800/90 border border-slate-700 text-slate-400 hover:text-white hover:bg-slate-700 flex items-center justify-center cursor-pointer transition-all duration-200 z-50"
             >
               ✕
             </button>
@@ -1913,10 +2726,7 @@ export default function CandidateProfilePage() {
               <form
                 onSubmit={(e) => {
                   e.preventDefault();
-                  saveToDatabase({
-                    ...profile,
-                    ...basicDraft,
-                  });
+                  saveToDatabase({ ...profile, ...basicDraft });
                 }}
               >
                 <div className="pb-5 mb-7 border-b border-slate-800 pr-12">
@@ -1928,7 +2738,6 @@ export default function CandidateProfilePage() {
                     recruiters can reach you easily.
                   </p>
                 </div>
-
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                   <div>
                     <label className={LABEL_CLASS}>Full Name *</label>
@@ -2045,7 +2854,6 @@ export default function CandidateProfilePage() {
                     />
                   </div>
                 </div>
-
                 {renderModalFooter('Save Changes')}
               </form>
             )}
@@ -2063,11 +2871,9 @@ export default function CandidateProfilePage() {
                     Resume headline
                   </h3>
                   <p className="text-xs text-slate-400 mt-1">
-                    It is the first thing recruiters notice in your profile.
                     Write a concise headline describing your expertise.
                   </p>
                 </div>
-
                 <div>
                   <label className={LABEL_CLASS}>Headline *</label>
                   <textarea
@@ -2079,7 +2885,6 @@ export default function CandidateProfilePage() {
                     className={`${INPUT_CLASS} leading-relaxed`}
                   />
                 </div>
-
                 {renderModalFooter()}
               </form>
             )}
@@ -2097,37 +2902,19 @@ export default function CandidateProfilePage() {
                     Key skills
                   </h3>
                   <p className="text-xs text-slate-400 mt-1">
-                    Add skills that best define your expertise, software tools,
-                    and domain specializations.
+                    Add skills that best define your expertise.
                   </p>
                 </div>
-
                 <div className="space-y-6">
-                  <div>
-                    <label className={LABEL_CLASS}>Add a Skill</label>
-                    <div className="flex gap-3">
-                      <input
-                        type="text"
-                        placeholder="Enter a skill and click Add"
-                        value={newSkillInput}
-                        onChange={(e) => setNewSkillInput(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') {
-                            e.preventDefault();
-                            if (newSkillInput.trim()) {
-                              setSkillsDraft([
-                                ...skillsDraft,
-                                newSkillInput.trim(),
-                              ]);
-                              setNewSkillInput('');
-                            }
-                          }
-                        }}
-                        className={INPUT_CLASS}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => {
+                  <div className="flex gap-3">
+                    <input
+                      type="text"
+                      placeholder="Enter a skill and click Add"
+                      value={newSkillInput}
+                      onChange={(e) => setNewSkillInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
                           if (newSkillInput.trim()) {
                             setSkillsDraft([
                               ...skillsDraft,
@@ -2135,12 +2922,25 @@ export default function CandidateProfilePage() {
                             ]);
                             setNewSkillInput('');
                           }
-                        }}
-                        className="px-6 py-3.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-extrabold text-blue-400 cursor-pointer shrink-0 transition"
-                      >
-                        + Add
-                      </button>
-                    </div>
+                        }
+                      }}
+                      className={INPUT_CLASS}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (newSkillInput.trim()) {
+                          setSkillsDraft([
+                            ...skillsDraft,
+                            newSkillInput.trim(),
+                          ]);
+                          setNewSkillInput('');
+                        }
+                      }}
+                      className="px-6 py-3.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-extrabold text-blue-400 cursor-pointer shrink-0"
+                    >
+                      + Add
+                    </button>
                   </div>
 
                   <div className="min-h-[60px] p-4 rounded-2xl bg-slate-950/60 border border-slate-800 flex flex-wrap gap-2.5">
@@ -2166,122 +2966,160 @@ export default function CandidateProfilePage() {
                       ))
                     ) : (
                       <span className="text-xs text-slate-500">
-                        No skills added yet. Type a skill above and click + Add.
+                        No skills added yet.
                       </span>
                     )}
                   </div>
                 </div>
-
                 {renderModalFooter('Save Skills')}
               </form>
             )}
 
-            {/* MODAL 4: EMPLOYMENT */}
+            {/* MODAL 4: EMPLOYMENT FORM */}
             {activeModal === 'employment' && (
-              <form
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  const entry = {
-                    ...empDraft,
-                    id: empDraft.id || String(Date.now()),
-                  };
-                  const exists = profile.employmentList.some(
-                    (i) => i.id === entry.id
-                  );
-                  const nextList = exists
-                    ? profile.employmentList.map((i) =>
-                        i.id === entry.id ? entry : i
-                      )
-                    : [entry, ...profile.employmentList];
-
-                  saveToDatabase({
-                    ...profile,
-                    designation: profile.designation || entry.designation,
-                    company: profile.company || entry.company,
-                    employmentList: nextList,
-                  });
-                }}
-              >
+              <form noValidate onSubmit={handleSaveEmployment}>
                 <div className="pb-5 mb-7 border-b border-slate-800 pr-12">
                   <h3 className="text-xl font-extrabold text-white">
-                    {empDraft.id ? 'Edit Employment' : 'Add Employment'}
+                    Employment
                   </h3>
                   <p className="text-xs text-slate-400 mt-1">
-                    Details like job title, company name, and key achievements
-                    help recruiters understand your background.
+                    Details like job title, company name, etc, help employers
+                    understand your work
                   </p>
                 </div>
 
                 <div className="space-y-6">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                    <div>
-                      <label className={LABEL_CLASS}>
-                        Designation / Job Title *
+                  <div>
+                    <label className={LABEL_CLASS}>
+                      Is this your current employment?
+                    </label>
+                    <div className="flex items-center gap-12 pt-1 text-xs font-bold text-slate-200">
+                      <label className="flex items-center gap-2.5 cursor-pointer">
+                        <input
+                          type="radio"
+                          name="isCurrentEmployment"
+                          checked={empDraft.isCurrentEmployment === 'Yes'}
+                          onChange={() =>
+                            setEmpDraft({
+                              ...empDraft,
+                              isCurrentEmployment: 'Yes',
+                            })
+                          }
+                          className="w-4 h-4 accent-blue-600 cursor-pointer"
+                        />
+                        <span>Yes</span>
                       </label>
-                      <input
-                        type="text"
-                        required
-                        placeholder="Enter designation or job title"
-                        value={empDraft.designation}
-                        onChange={(e) =>
-                          setEmpDraft({
-                            ...empDraft,
-                            designation: e.target.value,
-                          })
-                        }
-                        className={INPUT_CLASS}
-                      />
-                    </div>
-                    <div>
-                      <label className={LABEL_CLASS}>Company Name *</label>
-                      <input
-                        type="text"
-                        required
-                        placeholder="Enter company name"
-                        value={empDraft.company}
-                        onChange={(e) =>
-                          setEmpDraft({ ...empDraft, company: e.target.value })
-                        }
-                        className={INPUT_CLASS}
-                      />
-                    </div>
-                    <div>
-                      <label className={LABEL_CLASS}>Start Date</label>
-                      <input
-                        type="text"
-                        placeholder="Enter start month and year"
-                        value={empDraft.startDate}
-                        onChange={(e) =>
-                          setEmpDraft({
-                            ...empDraft,
-                            startDate: e.target.value,
-                          })
-                        }
-                        className={INPUT_CLASS}
-                      />
-                    </div>
-                    <div>
-                      <label className={LABEL_CLASS}>End Date</label>
-                      <input
-                        type="text"
-                        placeholder="Enter end date or Present"
-                        value={empDraft.endDate}
-                        onChange={(e) =>
-                          setEmpDraft({ ...empDraft, endDate: e.target.value })
-                        }
-                        className={INPUT_CLASS}
-                      />
+                      <label className="flex items-center gap-2.5 cursor-pointer">
+                        <input
+                          type="radio"
+                          name="isCurrentEmployment"
+                          checked={empDraft.isCurrentEmployment === 'No'}
+                          onChange={() =>
+                            setEmpDraft({
+                              ...empDraft,
+                              isCurrentEmployment: 'No',
+                            })
+                          }
+                          className="w-4 h-4 accent-blue-600 cursor-pointer"
+                        />
+                        <span>No</span>
+                      </label>
                     </div>
                   </div>
 
                   <div>
-                    <label className={LABEL_CLASS}>Top 5 Key Skills Used</label>
+                    <label className={LABEL_CLASS}>Employment type</label>
+                    <div className="flex items-center gap-12 pt-1 text-xs font-bold text-slate-200">
+                      <label className="flex items-center gap-2.5 cursor-pointer">
+                        <input
+                          type="radio"
+                          name="employmentType"
+                          checked={empDraft.employmentType === 'Full-time'}
+                          onChange={() =>
+                            setEmpDraft({
+                              ...empDraft,
+                              employmentType: 'Full-time',
+                            })
+                          }
+                          className="w-4 h-4 accent-blue-600 cursor-pointer"
+                        />
+                        <span>Full-time</span>
+                      </label>
+                      <label className="flex items-center gap-2.5 cursor-pointer">
+                        <input
+                          type="radio"
+                          name="employmentType"
+                          checked={empDraft.employmentType === 'Internship'}
+                          onChange={() =>
+                            setEmpDraft({
+                              ...empDraft,
+                              employmentType: 'Internship',
+                            })
+                          }
+                          className="w-4 h-4 accent-blue-600 cursor-pointer"
+                        />
+                        <span>Internship</span>
+                      </label>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className={LABEL_CLASS}>
+                      Total experience <span className="text-red-500">*</span>
+                    </label>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <select
+                        value={empDraft.totalExpYears}
+                        onChange={(e) =>
+                          setEmpDraft({
+                            ...empDraft,
+                            totalExpYears: e.target.value,
+                          })
+                        }
+                        className={`${INPUT_CLASS} cursor-pointer`}
+                      >
+                        <option value="">Years</option>
+                        {Array.from({ length: 31 }, (_, i) => (
+                          <option key={i} value={String(i)}>
+                            {i} {i === 1 ? 'Year' : 'Years'}
+                          </option>
+                        ))}
+                      </select>
+
+                      <select
+                        value={empDraft.totalExpMonths}
+                        onChange={(e) =>
+                          setEmpDraft({
+                            ...empDraft,
+                            totalExpMonths: e.target.value,
+                          })
+                        }
+                        className={`${INPUT_CLASS} cursor-pointer`}
+                      >
+                        <option value="">Months</option>
+                        {Array.from({ length: 12 }, (_, i) => (
+                          <option key={i} value={String(i)}>
+                            {i} {i === 1 ? 'Month' : 'Months'}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className={LABEL_CLASS}>
+                      {empDraft.isCurrentEmployment === 'Yes'
+                        ? 'Current company name'
+                        : 'Company name'}{' '}
+                      <span className="text-red-500">*</span>
+                    </label>
                     <input
                       type="text"
-                      placeholder="Enter key skills separated by commas"
-                      value={empDraft.topSkills}
+                      required
+                      placeholder="Type your organization"
+                      value={empDraft.company}
                       onChange={(e) =>
-                        setEmpDraft({ ...empDraft, topSkills: e.target.value })
+                        setEmpDraft({ ...empDraft, company: e.target.value })
                       }
                       className={INPUT_CLASS}
                     />
@@ -2289,81 +3127,282 @@ export default function CandidateProfilePage() {
 
                   <div>
                     <label className={LABEL_CLASS}>
-                      Job Profile / Description
+                      {empDraft.isCurrentEmployment === 'Yes'
+                        ? 'Current job title'
+                        : 'Job title'}{' '}
+                      <span className="text-red-500">*</span>
                     </label>
-                    <textarea
-                      rows={4}
-                      placeholder="Describe your responsibilities and key achievements"
-                      value={empDraft.description}
+                    <input
+                      type="text"
+                      required
+                      placeholder="Type your designation"
+                      value={empDraft.designation}
                       onChange={(e) =>
                         setEmpDraft({
                           ...empDraft,
-                          description: e.target.value,
+                          designation: e.target.value,
                         })
                       }
-                      className={`${INPUT_CLASS} leading-relaxed`}
+                      className={INPUT_CLASS}
                     />
                   </div>
+
+                  <div>
+                    <label className={LABEL_CLASS}>
+                      Joining date <span className="text-red-500">*</span>
+                    </label>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <select
+                        value={empDraft.joiningYear}
+                        onChange={(e) =>
+                          setEmpDraft({
+                            ...empDraft,
+                            joiningYear: e.target.value,
+                          })
+                        }
+                        className={`${INPUT_CLASS} cursor-pointer`}
+                      >
+                        <option value="">Select Year</option>
+                        {YEARS_LIST.map((yr) => (
+                          <option key={yr} value={yr}>
+                            {yr}
+                          </option>
+                        ))}
+                      </select>
+
+                      <select
+                        value={empDraft.joiningMonth}
+                        onChange={(e) =>
+                          setEmpDraft({
+                            ...empDraft,
+                            joiningMonth: e.target.value,
+                          })
+                        }
+                        className={`${INPUT_CLASS} cursor-pointer`}
+                      >
+                        <option value="">Select Month</option>
+                        {MONTHS_LIST.map((m) => (
+                          <option key={m} value={m}>
+                            {m}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  {empDraft.isCurrentEmployment === 'No' && (
+                    <div>
+                      <label className={LABEL_CLASS}>Worked till</label>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <select
+                          value={empDraft.workedTillYear || ''}
+                          onChange={(e) =>
+                            setEmpDraft({
+                              ...empDraft,
+                              workedTillYear: e.target.value,
+                            })
+                          }
+                          className={`${INPUT_CLASS} cursor-pointer`}
+                        >
+                          <option value="">Select Year</option>
+                          {YEARS_LIST.map((yr) => (
+                            <option key={yr} value={yr}>
+                              {yr}
+                            </option>
+                          ))}
+                        </select>
+
+                        <select
+                          value={empDraft.workedTillMonth || ''}
+                          onChange={(e) =>
+                            setEmpDraft({
+                              ...empDraft,
+                              workedTillMonth: e.target.value,
+                            })
+                          }
+                          className={`${INPUT_CLASS} cursor-pointer`}
+                        >
+                          <option value="">Select Month</option>
+                          {MONTHS_LIST.map((m) => (
+                            <option key={m} value={m}>
+                              {m}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                  )}
+
+                  <div>
+                    <label className={LABEL_CLASS}>
+                      Current salary{' '}
+                      {empDraft.isCurrentEmployment === 'Yes' && (
+                        <span className="text-red-500">*</span>
+                      )}
+                    </label>
+                    <div className="flex gap-3">
+                      <select
+                        value={empDraft.currency || '₹'}
+                        onChange={(e) =>
+                          setEmpDraft({ ...empDraft, currency: e.target.value })
+                        }
+                        className="w-24 bg-slate-950/90 border border-slate-700/90 rounded-xl px-3.5 py-3.5 text-sm text-white outline-none focus:border-blue-500 cursor-pointer shrink-0"
+                      >
+                        <option value="₹">₹</option>
+                        <option value="$">$</option>
+                      </select>
+
+                      <input
+                        type="text"
+                        placeholder="Enter annual salary"
+                        value={empDraft.salary}
+                        onChange={(e) =>
+                          setEmpDraft({ ...empDraft, salary: e.target.value })
+                        }
+                        className={INPUT_CLASS}
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className={LABEL_CLASS}>
+                      Skills used{' '}
+                      {empDraft.isCurrentEmployment === 'Yes' && (
+                        <span className="text-red-500">*</span>
+                      )}
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Add skills"
+                      value={empDraft.skillsUsed}
+                      onChange={(e) =>
+                        setEmpDraft({ ...empDraft, skillsUsed: e.target.value })
+                      }
+                      className={INPUT_CLASS}
+                    />
+                  </div>
+
+                  <div>
+                    <label className={LABEL_CLASS}>Job profile</label>
+                    <div className="rounded-2xl bg-slate-950/90 border border-slate-700/90 overflow-hidden focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-500/20 transition-all">
+                      <div className="px-4 py-2.5 border-b border-slate-800 flex items-center">
+                        <button
+                          type="button"
+                          onClick={handleWriteWithAi}
+                          className="px-3.5 py-1 rounded-full bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/40 text-amber-300 text-xs font-bold flex items-center gap-1.5 transition cursor-pointer"
+                        >
+                          <span>👑</span>
+                          <span>Write with AI</span>
+                        </button>
+                      </div>
+                      <textarea
+                        rows={5}
+                        maxLength={4000}
+                        placeholder="Type here..."
+                        value={empDraft.description}
+                        onChange={(e) =>
+                          setEmpDraft({
+                            ...empDraft,
+                            description: e.target.value,
+                          })
+                        }
+                        className="w-full bg-transparent p-4 text-sm text-white placeholder:text-slate-500 outline-none leading-relaxed resize-y"
+                      />
+                    </div>
+                    <p className="text-[11px] text-slate-400 text-right mt-1.5">
+                      {4000 - (empDraft.description?.length || 0)} character(s)
+                      left
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className={LABEL_CLASS}>
+                      Notice period{' '}
+                      {empDraft.isCurrentEmployment === 'Yes' && (
+                        <span className="text-red-500">*</span>
+                      )}
+                    </label>
+                    <select
+                      value={empDraft.noticePeriod}
+                      onChange={(e) =>
+                        setEmpDraft({
+                          ...empDraft,
+                          noticePeriod: e.target.value,
+                        })
+                      }
+                      className={`${INPUT_CLASS} cursor-pointer`}
+                    >
+                      <option value="">Select notice period</option>
+                      <option value="15 Days or less">15 Days or less</option>
+                      <option value="1 Month">1 Month</option>
+                      <option value="2 Months">2 Months</option>
+                      <option value="3 Months">3 Months</option>
+                      <option value="More than 3 Months">
+                        More than 3 Months
+                      </option>
+                      <option value="Serving Notice Period">
+                        Serving Notice Period
+                      </option>
+                    </select>
+                  </div>
+
+                  {empError && (
+                    <p className="text-red-400 text-xs font-bold bg-red-500/10 px-4 py-3 rounded-xl border border-red-500/20">
+                      {empError}
+                    </p>
+                  )}
                 </div>
 
-                {renderModalFooter()}
+                {renderModalFooter('Save')}
               </form>
             )}
 
-            {/* MODAL 5: EDUCATION */}
+            {/* MODAL 5: EDUCATION FORM */}
             {activeModal === 'education' && (
-              <form
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  const entry = {
-                    ...eduDraft,
-                    id: eduDraft.id || String(Date.now()),
-                  };
-                  const exists = profile.educationList.some(
-                    (i) => i.id === entry.id
-                  );
-                  const nextList = exists
-                    ? profile.educationList.map((i) =>
-                        i.id === entry.id ? entry : i
-                      )
-                    : [...profile.educationList, entry];
-                  saveToDatabase({ ...profile, educationList: nextList });
-                }}
-              >
+              <form noValidate onSubmit={handleSaveEducation}>
                 <div className="pb-5 mb-7 border-b border-slate-800 pr-12">
                   <h3 className="text-xl font-extrabold text-white">
-                    {eduDraft.id ? 'Edit Education' : 'Add Education'}
+                    Education
                   </h3>
                   <p className="text-xs text-slate-400 mt-1">
-                    Add your academic qualifications, university, and course
-                    details.
+                    Details like course, university, and more, help recruiters
+                    identify your educational background
                   </p>
                 </div>
 
                 <div className="space-y-6">
                   <div>
                     <label className={LABEL_CLASS}>
-                      Degree / Specialization *
+                      Education <span className="text-red-500">*</span>
                     </label>
-                    <input
-                      type="text"
-                      required
-                      placeholder="Enter degree and specialization"
-                      value={eduDraft.degree}
+                    <select
+                      value={eduDraft.educationLevel || ''}
                       onChange={(e) =>
-                        setEduDraft({ ...eduDraft, degree: e.target.value })
+                        setEduDraft({
+                          ...eduDraft,
+                          educationLevel: e.target.value,
+                        })
                       }
-                      className={INPUT_CLASS}
-                    />
+                      className={`${INPUT_CLASS} cursor-pointer`}
+                    >
+                      <option value="">Select education</option>
+                      {EDUCATION_LEVELS.map((lvl) => (
+                        <option key={lvl} value={lvl}>
+                          {lvl}
+                        </option>
+                      ))}
+                    </select>
                   </div>
+
                   <div>
                     <label className={LABEL_CLASS}>
-                      University / Institute *
+                      University/Institute{' '}
+                      <span className="text-red-500">*</span>
                     </label>
                     <input
                       type="text"
                       required
-                      placeholder="Enter university or institute name"
+                      placeholder="Select university/institute"
                       value={eduDraft.institute}
                       onChange={(e) =>
                         setEduDraft({ ...eduDraft, institute: e.target.value })
@@ -2371,87 +3410,195 @@ export default function CandidateProfilePage() {
                       className={INPUT_CLASS}
                     />
                   </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                    <div>
-                      <label className={LABEL_CLASS}>
-                        Passing Year / Duration
-                      </label>
-                      <input
-                        type="text"
-                        placeholder="Enter passing year or duration"
-                        value={eduDraft.yearRange}
-                        onChange={(e) =>
-                          setEduDraft({
-                            ...eduDraft,
-                            yearRange: e.target.value,
-                          })
-                        }
-                        className={INPUT_CLASS}
-                      />
+
+                  <div>
+                    <label className={LABEL_CLASS}>
+                      Course <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      value={eduDraft.course || ''}
+                      onChange={(e) =>
+                        setEduDraft({ ...eduDraft, course: e.target.value })
+                      }
+                      className={`${INPUT_CLASS} cursor-pointer`}
+                    >
+                      <option value="">Select course</option>
+                      {COURSE_OPTIONS.map((c) => (
+                        <option key={c} value={c}>
+                          {c}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className={LABEL_CLASS}>
+                      Specialization <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      value={eduDraft.specialization || ''}
+                      onChange={(e) =>
+                        setEduDraft({
+                          ...eduDraft,
+                          specialization: e.target.value,
+                        })
+                      }
+                      className={`${INPUT_CLASS} cursor-pointer`}
+                    >
+                      <option value="">Select specialization</option>
+                      {SPECIALIZATION_OPTIONS.map((sp) => (
+                        <option key={sp} value={sp}>
+                          {sp}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className={LABEL_CLASS}>
+                      Course type <span className="text-red-500">*</span>
+                    </label>
+                    <div className="flex flex-wrap items-center gap-8 sm:gap-12 pt-1 text-xs font-bold text-slate-200">
+                      {(
+                        [
+                          'Full time',
+                          'Part time',
+                          'Correspondence/Distance learning',
+                        ] as const
+                      ).map((type) => (
+                        <label
+                          key={type}
+                          className="flex items-center gap-2.5 cursor-pointer"
+                        >
+                          <input
+                            type="radio"
+                            name="eduCourseType"
+                            checked={
+                              (eduDraft.courseType || '').toLowerCase() ===
+                              type.toLowerCase()
+                            }
+                            onChange={() =>
+                              setEduDraft({ ...eduDraft, courseType: type })
+                            }
+                            className="w-4 h-4 accent-blue-600 cursor-pointer"
+                          />
+                          <span>{type}</span>
+                        </label>
+                      ))}
                     </div>
-                    <div>
-                      <label className={LABEL_CLASS}>Course Type</label>
+                  </div>
+
+                  <div>
+                    <label className={LABEL_CLASS}>
+                      Course duration <span className="text-red-500">*</span>
+                    </label>
+                    <div className="flex flex-col sm:flex-row items-center gap-3">
                       <select
-                        value={eduDraft.courseType}
+                        value={eduDraft.startYear || ''}
                         onChange={(e) =>
                           setEduDraft({
                             ...eduDraft,
-                            courseType: e.target.value,
+                            startYear: e.target.value,
                           })
                         }
-                        className={INPUT_CLASS}
+                        className={`${INPUT_CLASS} cursor-pointer flex-1`}
                       >
-                        <option value="Full Time">Full Time</option>
-                        <option value="Part Time">Part Time</option>
-                        <option value="Distance">Distance</option>
+                        <option value="">Starting year</option>
+                        {EDU_YEARS_LIST.map((yr) => (
+                          <option key={yr} value={yr}>
+                            {yr}
+                          </option>
+                        ))}
+                      </select>
+
+                      <span className="text-xs font-bold text-slate-400 px-1 shrink-0">
+                        To
+                      </span>
+
+                      <select
+                        value={eduDraft.endYear || ''}
+                        onChange={(e) =>
+                          setEduDraft({ ...eduDraft, endYear: e.target.value })
+                        }
+                        className={`${INPUT_CLASS} cursor-pointer flex-1`}
+                      >
+                        <option value="">Ending year</option>
+                        {EDU_YEARS_LIST.map((yr) => (
+                          <option key={yr} value={yr}>
+                            {yr}
+                          </option>
+                        ))}
                       </select>
                     </div>
                   </div>
+
+                  <div>
+                    <label className={LABEL_CLASS}>Grading system</label>
+                    <select
+                      value={eduDraft.gradingSystem || ''}
+                      onChange={(e) =>
+                        setEduDraft({
+                          ...eduDraft,
+                          gradingSystem: e.target.value,
+                        })
+                      }
+                      className={`${INPUT_CLASS} cursor-pointer`}
+                    >
+                      <option value="">Select grading system</option>
+                      {GRADING_SYSTEM_OPTIONS.map((gs) => (
+                        <option key={gs} value={gs}>
+                          {gs}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {eduError && (
+                    <p className="text-red-400 text-xs font-bold bg-red-500/10 px-4 py-3 rounded-xl border border-red-500/20">
+                      {eduError}
+                    </p>
+                  )}
                 </div>
 
-                {renderModalFooter()}
+                {renderModalFooter('Save')}
               </form>
             )}
 
-            {/* MODAL 6: IT SKILL */}
+            {/* MODAL 6: IT SKILLS FORM */}
             {activeModal === 'itSkill' && (
-              <form
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  const entry = {
-                    ...itSkillDraft,
-                    id: itSkillDraft.id || String(Date.now()),
-                  };
-                  const exists = profile.itSkills.some(
-                    (i) => i.id === entry.id
-                  );
-                  const nextList = exists
-                    ? profile.itSkills.map((i) =>
-                        i.id === entry.id ? entry : i
-                      )
-                    : [...profile.itSkills, entry];
-                  saveToDatabase({ ...profile, itSkills: nextList });
-                }}
-              >
+              <form noValidate onSubmit={handleSaveItSkill}>
                 <div className="pb-5 mb-7 border-b border-slate-800 pr-12">
-                  <h3 className="text-xl font-extrabold text-white">
-                    {itSkillDraft.id ? 'Edit IT Skill' : 'Add IT Skill'}
-                  </h3>
-                  <p className="text-xs text-slate-400 mt-1">
-                    Specify technical tools, software versions, and hands-on
-                    experience.
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-xl font-extrabold text-white">
+                      IT skills
+                    </h3>
+                    {itSkillDraft.id && (
+                      <button
+                        type="button"
+                        onClick={handleDeleteCurrentItSkill}
+                        className="text-xs font-extrabold text-blue-400 hover:text-red-400 transition-colors cursor-pointer"
+                      >
+                        Delete
+                      </button>
+                    )}
+                  </div>
+                  <p className="text-xs text-slate-400 mt-1 leading-relaxed">
+                    Mention skills like programming languages (Java, Python),
+                    softwares (Microsoft Word, Excel) and more, to show your
+                    technical expertise.
                   </p>
                 </div>
 
                 <div className="space-y-6">
                   <div>
                     <label className={LABEL_CLASS}>
-                      Skill / Software Name *
+                      Skill / software name{' '}
+                      <span className="text-red-500">*</span>
                     </label>
                     <input
                       type="text"
                       required
-                      placeholder="Enter skill or software name"
+                      placeholder="Skill / Software name"
                       value={itSkillDraft.skill}
                       onChange={(e) =>
                         setItSkillDraft({
@@ -2462,12 +3609,13 @@ export default function CandidateProfilePage() {
                       className={INPUT_CLASS}
                     />
                   </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
-                      <label className={LABEL_CLASS}>Version</label>
+                      <label className={LABEL_CLASS}>Software version</label>
                       <input
                         type="text"
-                        placeholder="Enter version"
+                        placeholder="Software version"
                         value={itSkillDraft.version}
                         onChange={(e) =>
                           setItSkillDraft({
@@ -2478,11 +3626,10 @@ export default function CandidateProfilePage() {
                         className={INPUT_CLASS}
                       />
                     </div>
+
                     <div>
-                      <label className={LABEL_CLASS}>Last Used</label>
-                      <input
-                        type="text"
-                        placeholder="Enter year last used"
+                      <label className={LABEL_CLASS}>Last used</label>
+                      <select
                         value={itSkillDraft.lastUsed}
                         onChange={(e) =>
                           setItSkillDraft({
@@ -2490,28 +3637,71 @@ export default function CandidateProfilePage() {
                             lastUsed: e.target.value,
                           })
                         }
-                        className={INPUT_CLASS}
-                      />
+                        className={`${INPUT_CLASS} cursor-pointer`}
+                      >
+                        <option value="">Select year</option>
+                        {YEARS_LIST.map((yr) => (
+                          <option key={yr} value={yr}>
+                            {yr}
+                          </option>
+                        ))}
+                      </select>
                     </div>
-                    <div>
-                      <label className={LABEL_CLASS}>Experience</label>
-                      <input
-                        type="text"
-                        placeholder="Enter experience duration"
-                        value={itSkillDraft.experience}
+                  </div>
+
+                  <div>
+                    <label className={LABEL_CLASS}>Experience</label>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <select
+                        value={itSkillDraft.expYears || '0 Year'}
                         onChange={(e) =>
                           setItSkillDraft({
                             ...itSkillDraft,
-                            experience: e.target.value,
+                            expYears: e.target.value,
                           })
                         }
-                        className={INPUT_CLASS}
-                      />
+                        className={`${INPUT_CLASS} cursor-pointer`}
+                      >
+                        {Array.from({ length: 31 }, (_, i) => {
+                          const label = `${i} ${i <= 1 ? 'Year' : 'Years'}`;
+                          return (
+                            <option key={label} value={label}>
+                              {label}
+                            </option>
+                          );
+                        })}
+                      </select>
+
+                      <select
+                        value={itSkillDraft.expMonths || '0 Month'}
+                        onChange={(e) =>
+                          setItSkillDraft({
+                            ...itSkillDraft,
+                            expMonths: e.target.value,
+                          })
+                        }
+                        className={`${INPUT_CLASS} cursor-pointer`}
+                      >
+                        {Array.from({ length: 12 }, (_, i) => {
+                          const label = `${i} ${i <= 1 ? 'Month' : 'Months'}`;
+                          return (
+                            <option key={label} value={label}>
+                              {label}
+                            </option>
+                          );
+                        })}
+                      </select>
                     </div>
                   </div>
+
+                  {itSkillError && (
+                    <p className="text-red-400 text-xs font-bold bg-red-500/10 px-4 py-3 rounded-xl border border-red-500/20">
+                      {itSkillError}
+                    </p>
+                  )}
                 </div>
 
-                {renderModalFooter()}
+                {renderModalFooter('Save')}
               </form>
             )}
 
@@ -2539,12 +3729,7 @@ export default function CandidateProfilePage() {
                   <h3 className="text-xl font-extrabold text-white">
                     {projectDraft.id ? 'Edit Project' : 'Add Project'}
                   </h3>
-                  <p className="text-xs text-slate-400 mt-1">
-                    Showcase key projects, client engagements, and technical
-                    deliverables.
-                  </p>
                 </div>
-
                 <div className="space-y-6">
                   <div>
                     <label className={LABEL_CLASS}>Project Title *</label>
@@ -2612,7 +3797,6 @@ export default function CandidateProfilePage() {
                     />
                   </div>
                 </div>
-
                 {renderModalFooter()}
               </form>
             )}
@@ -2629,12 +3813,7 @@ export default function CandidateProfilePage() {
                   <h3 className="text-xl font-extrabold text-white">
                     Profile summary
                   </h3>
-                  <p className="text-xs text-slate-400 mt-1">
-                    Highlight your career accomplishments, leadership
-                    experience, and core strengths.
-                  </p>
                 </div>
-
                 <div>
                   <label className={LABEL_CLASS}>Summary *</label>
                   <textarea
@@ -2646,142 +3825,822 @@ export default function CandidateProfilePage() {
                     className={`${INPUT_CLASS} leading-relaxed`}
                   />
                 </div>
-
                 {renderModalFooter()}
               </form>
             )}
 
-            {/* MODAL 9: ACCOMPLISHMENT */}
+            {/* MODAL 9: 6 CATEGORY-SPECIFIC ACCOMPLISHMENT FORMS */}
             {activeModal === 'accomplishment' && (
-              <form
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  const entry = {
-                    ...accompDraft,
-                    id: accompDraft.id || String(Date.now()),
-                  };
-                  const currentList =
-                    profile.accomplishments[accompCategory] || [];
-                  const exists = currentList.some((i) => i.id === entry.id);
-                  const nextList = exists
-                    ? currentList.map((i) => (i.id === entry.id ? entry : i))
-                    : [...currentList, entry];
-                  saveToDatabase({
-                    ...profile,
-                    accomplishments: {
-                      ...profile.accomplishments,
-                      [accompCategory]: nextList,
-                    },
-                  });
-                }}
-              >
+              <form noValidate onSubmit={handleSaveAccomplishment}>
+                {accompCategory === 'onlineProfiles' && (
+                  <>
+                    <div className="pb-5 mb-7 border-b border-slate-800 pr-12">
+                      <h3 className="text-xl font-extrabold text-white">
+                        Online profiles
+                      </h3>
+                      <p className="text-xs text-slate-400 mt-1">
+                        Add link to online professional profiles (e.g. LinkedIn,
+                        etc.)
+                      </p>
+                    </div>
+                    <div className="space-y-6">
+                      <div>
+                        <label className={LABEL_CLASS}>
+                          Social profile <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          placeholder="Enter Social Profile Name"
+                          value={accompDraft.title}
+                          onChange={(e) =>
+                            setAccompDraft({
+                              ...accompDraft,
+                              title: e.target.value,
+                            })
+                          }
+                          className={INPUT_CLASS}
+                        />
+                      </div>
+                      <div>
+                        <label className={LABEL_CLASS}>
+                          URL <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          placeholder="Enter Social Profile URL"
+                          value={accompDraft.url}
+                          onChange={(e) =>
+                            setAccompDraft({
+                              ...accompDraft,
+                              url: e.target.value,
+                            })
+                          }
+                          className={INPUT_CLASS}
+                        />
+                      </div>
+                      <div>
+                        <label className={LABEL_CLASS}>Description</label>
+                        <textarea
+                          rows={4}
+                          maxLength={500}
+                          placeholder="Type here..."
+                          value={accompDraft.description || ''}
+                          onChange={(e) =>
+                            setAccompDraft({
+                              ...accompDraft,
+                              description: e.target.value,
+                            })
+                          }
+                          className={`${INPUT_CLASS} leading-relaxed`}
+                        />
+                        <p className="text-[11px] text-slate-400 text-right mt-1.5">
+                          {500 - (accompDraft.description?.length || 0)}{' '}
+                          character(s) left
+                        </p>
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                {accompCategory === 'workSamples' && (
+                  <>
+                    <div className="pb-5 mb-7 border-b border-slate-800 pr-12">
+                      <h3 className="text-xl font-extrabold text-white">
+                        Work samples
+                      </h3>
+                      <p className="text-xs text-slate-400 mt-1">
+                        Link relevant work samples (e.g. Github, Behance)
+                      </p>
+                    </div>
+                    <div className="space-y-6">
+                      <div>
+                        <label className={LABEL_CLASS}>
+                          Work title <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          placeholder="Enter work title"
+                          value={accompDraft.title}
+                          onChange={(e) =>
+                            setAccompDraft({
+                              ...accompDraft,
+                              title: e.target.value,
+                            })
+                          }
+                          className={INPUT_CLASS}
+                        />
+                      </div>
+                      <div>
+                        <label className={LABEL_CLASS}>
+                          URL <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          placeholder="Enter URL here"
+                          value={accompDraft.url}
+                          onChange={(e) =>
+                            setAccompDraft({
+                              ...accompDraft,
+                              url: e.target.value,
+                            })
+                          }
+                          className={INPUT_CLASS}
+                        />
+                      </div>
+                      <div>
+                        <label className={LABEL_CLASS}>Duration from</label>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          <select
+                            value={accompDraft.durationFromYear || ''}
+                            onChange={(e) =>
+                              setAccompDraft({
+                                ...accompDraft,
+                                durationFromYear: e.target.value,
+                              })
+                            }
+                            className={`${INPUT_CLASS} cursor-pointer`}
+                          >
+                            <option value="">Select year</option>
+                            {YEARS_LIST.map((yr) => (
+                              <option key={yr} value={yr}>
+                                {yr}
+                              </option>
+                            ))}
+                          </select>
+                          <select
+                            value={accompDraft.durationFromMonth || ''}
+                            onChange={(e) =>
+                              setAccompDraft({
+                                ...accompDraft,
+                                durationFromMonth: e.target.value,
+                              })
+                            }
+                            className={`${INPUT_CLASS} cursor-pointer`}
+                          >
+                            <option value="">Select month</option>
+                            {MONTHS_LIST.map((m) => (
+                              <option key={m} value={m}>
+                                {m}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+
+                      {!accompDraft.currentlyWorking && (
+                        <div>
+                          <label className={LABEL_CLASS}>Duration to</label>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <select
+                              value={accompDraft.durationToYear || ''}
+                              onChange={(e) =>
+                                setAccompDraft({
+                                  ...accompDraft,
+                                  durationToYear: e.target.value,
+                                })
+                              }
+                              className={`${INPUT_CLASS} cursor-pointer`}
+                            >
+                              <option value="">Select Year</option>
+                              {YEARS_LIST.map((yr) => (
+                                <option key={yr} value={yr}>
+                                  {yr}
+                                </option>
+                              ))}
+                            </select>
+                            <select
+                              value={accompDraft.durationToMonth || ''}
+                              onChange={(e) =>
+                                setAccompDraft({
+                                  ...accompDraft,
+                                  durationToMonth: e.target.value,
+                                })
+                              }
+                              className={`${INPUT_CLASS} cursor-pointer`}
+                            >
+                              <option value="">Select month</option>
+                              {MONTHS_LIST.map((m) => (
+                                <option key={m} value={m}>
+                                  {m}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        </div>
+                      )}
+
+                      <div>
+                        <label className="flex items-center gap-2.5 text-xs font-semibold text-slate-300 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={Boolean(accompDraft.currentlyWorking)}
+                            onChange={(e) =>
+                              setAccompDraft({
+                                ...accompDraft,
+                                currentlyWorking: e.target.checked,
+                              })
+                            }
+                            className="w-4 h-4 rounded accent-blue-600 cursor-pointer"
+                          />
+                          <span>I am currently working on this</span>
+                        </label>
+                      </div>
+
+                      <div>
+                        <label className={LABEL_CLASS}>Description</label>
+                        <textarea
+                          rows={4}
+                          maxLength={500}
+                          placeholder="Type here..."
+                          value={accompDraft.description || ''}
+                          onChange={(e) =>
+                            setAccompDraft({
+                              ...accompDraft,
+                              description: e.target.value,
+                            })
+                          }
+                          className={`${INPUT_CLASS} leading-relaxed`}
+                        />
+                        <p className="text-[11px] text-slate-400 text-right mt-1.5">
+                          {500 - (accompDraft.description?.length || 0)}{' '}
+                          Character(s) Left
+                        </p>
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                {accompCategory === 'publications' && (
+                  <>
+                    <div className="pb-5 mb-7 border-b border-slate-800 pr-12">
+                      <h3 className="text-xl font-extrabold text-white">
+                        White paper / Research publication / Journal entry
+                      </h3>
+                      <p className="text-xs text-slate-400 mt-1">
+                        Add links to your online publications
+                      </p>
+                    </div>
+                    <div className="space-y-6">
+                      <div>
+                        <label className={LABEL_CLASS}>
+                          Title <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          placeholder="Enter title"
+                          value={accompDraft.title}
+                          onChange={(e) =>
+                            setAccompDraft({
+                              ...accompDraft,
+                              title: e.target.value,
+                            })
+                          }
+                          className={INPUT_CLASS}
+                        />
+                      </div>
+                      <div>
+                        <label className={LABEL_CLASS}>
+                          URL <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          placeholder="Enter URL here"
+                          value={accompDraft.url}
+                          onChange={(e) =>
+                            setAccompDraft({
+                              ...accompDraft,
+                              url: e.target.value,
+                            })
+                          }
+                          className={INPUT_CLASS}
+                        />
+                      </div>
+                      <div>
+                        <label className={LABEL_CLASS}>Published on</label>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          <select
+                            value={accompDraft.publishedYear || ''}
+                            onChange={(e) =>
+                              setAccompDraft({
+                                ...accompDraft,
+                                publishedYear: e.target.value,
+                              })
+                            }
+                            className={`${INPUT_CLASS} cursor-pointer`}
+                          >
+                            <option value="">Select year</option>
+                            {YEARS_LIST.map((yr) => (
+                              <option key={yr} value={yr}>
+                                {yr}
+                              </option>
+                            ))}
+                          </select>
+                          <select
+                            value={accompDraft.publishedMonth || ''}
+                            onChange={(e) =>
+                              setAccompDraft({
+                                ...accompDraft,
+                                publishedMonth: e.target.value,
+                              })
+                            }
+                            className={`${INPUT_CLASS} cursor-pointer`}
+                          >
+                            <option value="">Select month</option>
+                            {MONTHS_LIST.map((m) => (
+                              <option key={m} value={m}>
+                                {m}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+                      <div>
+                        <label className={LABEL_CLASS}>Description</label>
+                        <textarea
+                          rows={4}
+                          maxLength={500}
+                          placeholder="Type here..."
+                          value={accompDraft.description || ''}
+                          onChange={(e) =>
+                            setAccompDraft({
+                              ...accompDraft,
+                              description: e.target.value,
+                            })
+                          }
+                          className={`${INPUT_CLASS} leading-relaxed`}
+                        />
+                        <p className="text-[11px] text-slate-400 text-right mt-1.5">
+                          {500 - (accompDraft.description?.length || 0)}{' '}
+                          Character(s) Left
+                        </p>
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                {accompCategory === 'presentations' && (
+                  <>
+                    <div className="pb-5 mb-7 border-b border-slate-800 pr-12">
+                      <h3 className="text-xl font-extrabold text-white">
+                        Presentation
+                      </h3>
+                      <p className="text-xs text-slate-400 mt-1">
+                        Add links to your online presentations (e.g. Slideshare
+                        presentation links etc.).
+                      </p>
+                    </div>
+                    <div className="space-y-6">
+                      <div>
+                        <label className={LABEL_CLASS}>
+                          Presentation title{' '}
+                          <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          placeholder="Enter presentation title"
+                          value={accompDraft.title}
+                          onChange={(e) =>
+                            setAccompDraft({
+                              ...accompDraft,
+                              title: e.target.value,
+                            })
+                          }
+                          className={INPUT_CLASS}
+                        />
+                      </div>
+                      <div>
+                        <label className={LABEL_CLASS}>
+                          URL <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          placeholder="Enter URL here"
+                          value={accompDraft.url}
+                          onChange={(e) =>
+                            setAccompDraft({
+                              ...accompDraft,
+                              url: e.target.value,
+                            })
+                          }
+                          className={INPUT_CLASS}
+                        />
+                      </div>
+                      <div>
+                        <label className={LABEL_CLASS}>Description</label>
+                        <textarea
+                          rows={4}
+                          maxLength={500}
+                          placeholder="Type here..."
+                          value={accompDraft.description || ''}
+                          onChange={(e) =>
+                            setAccompDraft({
+                              ...accompDraft,
+                              description: e.target.value,
+                            })
+                          }
+                          className={`${INPUT_CLASS} leading-relaxed`}
+                        />
+                        <p className="text-[11px] text-slate-400 text-right mt-1.5">
+                          {500 - (accompDraft.description?.length || 0)}{' '}
+                          Character(s) Left
+                        </p>
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                {accompCategory === 'patents' && (
+                  <>
+                    <div className="pb-5 mb-7 border-b border-slate-800 pr-12">
+                      <h3 className="text-xl font-extrabold text-white">
+                        Patent
+                      </h3>
+                      <p className="text-xs text-slate-400 mt-1">
+                        Add details of patents you have filed
+                      </p>
+                    </div>
+                    <div className="space-y-6">
+                      <div>
+                        <label className={LABEL_CLASS}>
+                          Patent title <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          placeholder="Enter title"
+                          value={accompDraft.title}
+                          onChange={(e) =>
+                            setAccompDraft({
+                              ...accompDraft,
+                              title: e.target.value,
+                            })
+                          }
+                          className={INPUT_CLASS}
+                        />
+                      </div>
+                      <div>
+                        <label className={LABEL_CLASS}>
+                          URL <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          placeholder="Enter patent URL here"
+                          value={accompDraft.url}
+                          onChange={(e) =>
+                            setAccompDraft({
+                              ...accompDraft,
+                              url: e.target.value,
+                            })
+                          }
+                          className={INPUT_CLASS}
+                        />
+                      </div>
+                      <div>
+                        <label className={LABEL_CLASS}>Patent office</label>
+                        <input
+                          type="text"
+                          placeholder="Enter patent office"
+                          value={accompDraft.patentOffice || ''}
+                          onChange={(e) =>
+                            setAccompDraft({
+                              ...accompDraft,
+                              patentOffice: e.target.value,
+                            })
+                          }
+                          className={INPUT_CLASS}
+                        />
+                      </div>
+                      <div>
+                        <label className={LABEL_CLASS}>Status</label>
+                        <div className="flex items-center gap-10 pt-1 text-xs font-bold text-slate-200">
+                          <label className="flex items-center gap-2.5 cursor-pointer">
+                            <input
+                              type="radio"
+                              name="patentStatus"
+                              checked={
+                                (accompDraft.patentStatus ||
+                                  'Patent issued') === 'Patent issued'
+                              }
+                              onChange={() =>
+                                setAccompDraft({
+                                  ...accompDraft,
+                                  patentStatus: 'Patent issued',
+                                })
+                              }
+                              className="w-4 h-4 accent-blue-600 cursor-pointer"
+                            />
+                            <span>Patent issued</span>
+                          </label>
+                          <label className="flex items-center gap-2.5 cursor-pointer">
+                            <input
+                              type="radio"
+                              name="patentStatus"
+                              checked={
+                                accompDraft.patentStatus === 'Patent pending'
+                              }
+                              onChange={() =>
+                                setAccompDraft({
+                                  ...accompDraft,
+                                  patentStatus: 'Patent pending',
+                                })
+                              }
+                              className="w-4 h-4 accent-blue-600 cursor-pointer"
+                            />
+                            <span>Patent pending</span>
+                          </label>
+                        </div>
+                      </div>
+                      <div>
+                        <label className={LABEL_CLASS}>
+                          Application number
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="Enter application number"
+                          value={accompDraft.applicationNumber || ''}
+                          onChange={(e) =>
+                            setAccompDraft({
+                              ...accompDraft,
+                              applicationNumber: e.target.value,
+                            })
+                          }
+                          className={INPUT_CLASS}
+                        />
+                      </div>
+                      <div>
+                        <label className={LABEL_CLASS}>Issue date</label>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          <select
+                            value={accompDraft.issueYear || ''}
+                            onChange={(e) =>
+                              setAccompDraft({
+                                ...accompDraft,
+                                issueYear: e.target.value,
+                              })
+                            }
+                            className={`${INPUT_CLASS} cursor-pointer`}
+                          >
+                            <option value="">Select year</option>
+                            {YEARS_LIST.map((yr) => (
+                              <option key={yr} value={yr}>
+                                {yr}
+                              </option>
+                            ))}
+                          </select>
+                          <select
+                            value={accompDraft.issueMonth || ''}
+                            onChange={(e) =>
+                              setAccompDraft({
+                                ...accompDraft,
+                                issueMonth: e.target.value,
+                              })
+                            }
+                            className={`${INPUT_CLASS} cursor-pointer`}
+                          >
+                            <option value="">Select month</option>
+                            {MONTHS_LIST.map((m) => (
+                              <option key={m} value={m}>
+                                {m}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+                      <div>
+                        <label className={LABEL_CLASS}>Description</label>
+                        <textarea
+                          rows={4}
+                          maxLength={500}
+                          placeholder="Type here..."
+                          value={accompDraft.description || ''}
+                          onChange={(e) =>
+                            setAccompDraft({
+                              ...accompDraft,
+                              description: e.target.value,
+                            })
+                          }
+                          className={`${INPUT_CLASS} leading-relaxed`}
+                        />
+                        <p className="text-[11px] text-slate-400 text-right mt-1.5">
+                          {500 - (accompDraft.description?.length || 0)}{' '}
+                          Character(s) Left
+                        </p>
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                {accompCategory === 'certifications' && (
+                  <>
+                    <div className="pb-5 mb-7 border-b border-slate-800 pr-12">
+                      <h3 className="text-xl font-extrabold text-white">
+                        Certifications
+                      </h3>
+                      <p className="text-xs text-slate-400 mt-1">
+                        Add details of Certifications you have
+                        achieved/completed
+                      </p>
+                    </div>
+                    <div className="space-y-6">
+                      <div>
+                        <label className={LABEL_CLASS}>
+                          Certification name{' '}
+                          <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          placeholder="Please enter your certification name"
+                          value={accompDraft.title}
+                          onChange={(e) =>
+                            setAccompDraft({
+                              ...accompDraft,
+                              title: e.target.value,
+                            })
+                          }
+                          className={INPUT_CLASS}
+                        />
+                      </div>
+                      <div>
+                        <label className={LABEL_CLASS}>
+                          Certification completion ID
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="Please mention your course completion ID"
+                          value={accompDraft.completionId || ''}
+                          onChange={(e) =>
+                            setAccompDraft({
+                              ...accompDraft,
+                              completionId: e.target.value,
+                            })
+                          }
+                          className={INPUT_CLASS}
+                        />
+                      </div>
+                      <div>
+                        <label className={LABEL_CLASS}>Certification URL</label>
+                        <input
+                          type="text"
+                          placeholder="Please mention your completion URL"
+                          value={accompDraft.url}
+                          onChange={(e) =>
+                            setAccompDraft({
+                              ...accompDraft,
+                              url: e.target.value,
+                            })
+                          }
+                          className={INPUT_CLASS}
+                        />
+                      </div>
+                      <div>
+                        <label className={LABEL_CLASS}>
+                          Certification validity
+                        </label>
+                        <div className="flex flex-col sm:flex-row items-center gap-3">
+                          <div className="grid grid-cols-2 gap-3 w-full flex-1">
+                            <select
+                              value={accompDraft.validityFromMonth || ''}
+                              onChange={(e) =>
+                                setAccompDraft({
+                                  ...accompDraft,
+                                  validityFromMonth: e.target.value,
+                                })
+                              }
+                              className={`${INPUT_CLASS} cursor-pointer`}
+                            >
+                              <option value="">MM</option>
+                              {MONTHS_LIST.map((m) => (
+                                <option key={m} value={m}>
+                                  {m}
+                                </option>
+                              ))}
+                            </select>
+                            <select
+                              value={accompDraft.validityFromYear || ''}
+                              onChange={(e) =>
+                                setAccompDraft({
+                                  ...accompDraft,
+                                  validityFromYear: e.target.value,
+                                })
+                              }
+                              className={`${INPUT_CLASS} cursor-pointer`}
+                            >
+                              <option value="">YYYY</option>
+                              {YEARS_LIST.map((yr) => (
+                                <option key={yr} value={yr}>
+                                  {yr}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+
+                          {!accompDraft.doesNotExpire && (
+                            <>
+                              <span className="text-xs font-bold text-slate-400 px-1 shrink-0">
+                                To
+                              </span>
+                              <div className="grid grid-cols-2 gap-3 w-full flex-1">
+                                <select
+                                  value={accompDraft.validityToMonth || ''}
+                                  onChange={(e) =>
+                                    setAccompDraft({
+                                      ...accompDraft,
+                                      validityToMonth: e.target.value,
+                                    })
+                                  }
+                                  className={`${INPUT_CLASS} cursor-pointer`}
+                                >
+                                  <option value="">MM</option>
+                                  {MONTHS_LIST.map((m) => (
+                                    <option key={m} value={m}>
+                                      {m}
+                                    </option>
+                                  ))}
+                                </select>
+                                <select
+                                  value={accompDraft.validityToYear || ''}
+                                  onChange={(e) =>
+                                    setAccompDraft({
+                                      ...accompDraft,
+                                      validityToYear: e.target.value,
+                                    })
+                                  }
+                                  className={`${INPUT_CLASS} cursor-pointer`}
+                                >
+                                  <option value="">YYYY</option>
+                                  {CERT_YEARS_LIST.map((yr) => (
+                                    <option key={yr} value={yr}>
+                                      {yr}
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                      <div>
+                        <label className="flex items-center gap-2.5 text-xs font-semibold text-slate-300 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={Boolean(accompDraft.doesNotExpire)}
+                            onChange={(e) =>
+                              setAccompDraft({
+                                ...accompDraft,
+                                doesNotExpire: e.target.checked,
+                              })
+                            }
+                            className="w-4 h-4 rounded accent-blue-600 cursor-pointer"
+                          />
+                          <span>This certification does not expire</span>
+                        </label>
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                {accompError && (
+                  <p className="text-red-400 text-xs font-bold bg-red-500/10 px-4 py-3 rounded-xl border border-red-500/20 mt-5">
+                    {accompError}
+                  </p>
+                )}
+
+                {renderModalFooter('Save')}
+              </form>
+            )}
+
+            {/* ================================================================
+                MODAL 10: CAREER PROFILE FORM (Matches Screenshots 2.57.57 & 2.58.02 PM)
+               ================================================================ */}
+            {activeModal === 'career' && (
+              <form noValidate onSubmit={handleSaveCareerProfile}>
                 <div className="pb-5 mb-7 border-b border-slate-800 pr-12">
                   <h3 className="text-xl font-extrabold text-white">
-                    Add / Edit Accomplishment
+                    Career profile
                   </h3>
-                  <p className="text-xs text-slate-400 mt-1">
-                    Include certifications, online profiles, work samples,
-                    publications, or patents.
+                  <p className="text-xs text-slate-400 mt-1 leading-relaxed">
+                    Add details about your current and preferred job profile.
+                    This helps us personalise your job recommendations.
                   </p>
                 </div>
 
                 <div className="space-y-6">
+                  {/* 1. Current industry * */}
                   <div>
                     <label className={LABEL_CLASS}>
-                      Title / Certification / Profile Name *
+                      Current industry <span className="text-red-500">*</span>
                     </label>
-                    <input
-                      type="text"
-                      required
-                      placeholder="Enter title or certification name"
-                      value={accompDraft.title}
-                      onChange={(e) =>
-                        setAccompDraft({
-                          ...accompDraft,
-                          title: e.target.value,
-                        })
-                      }
-                      className={INPUT_CLASS}
-                    />
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                    <div>
-                      <label className={LABEL_CLASS}>
-                        Issuer / Organization
-                      </label>
-                      <input
-                        type="text"
-                        placeholder="Enter issuing organization"
-                        value={accompDraft.subtitle}
-                        onChange={(e) =>
-                          setAccompDraft({
-                            ...accompDraft,
-                            subtitle: e.target.value,
-                          })
-                        }
-                        className={INPUT_CLASS}
-                      />
-                    </div>
-                    <div>
-                      <label className={LABEL_CLASS}>Validity / Date</label>
-                      <input
-                        type="text"
-                        placeholder="Enter validity period or date"
-                        value={accompDraft.validity}
-                        onChange={(e) =>
-                          setAccompDraft({
-                            ...accompDraft,
-                            validity: e.target.value,
-                          })
-                        }
-                        className={INPUT_CLASS}
-                      />
-                    </div>
-                  </div>
-                  <div>
-                    <label className={LABEL_CLASS}>
-                      URL / Verification Link
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="https://"
-                      value={accompDraft.url}
-                      onChange={(e) =>
-                        setAccompDraft({ ...accompDraft, url: e.target.value })
-                      }
-                      className={INPUT_CLASS}
-                    />
-                  </div>
-                </div>
-
-                {renderModalFooter()}
-              </form>
-            )}
-
-            {/* MODAL 10: CAREER PROFILE */}
-            {activeModal === 'career' && (
-              <form
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  saveToDatabase({ ...profile, careerProfile: careerDraft });
-                }}
-              >
-                <div className="pb-5 mb-7 border-b border-slate-800 pr-12">
-                  <h3 className="text-xl font-extrabold text-white">
-                    Edit Career Profile
-                  </h3>
-                  <p className="text-xs text-slate-400 mt-1">
-                    Specify your desired role, preferred locations, and
-                    compensation expectations.
-                  </p>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                  <div>
-                    <label className={LABEL_CLASS}>Current Industry</label>
-                    <input
-                      type="text"
-                      placeholder="Enter current industry"
+                    <select
                       value={careerDraft.currentIndustry}
                       onChange={(e) =>
                         setCareerDraft({
@@ -2789,14 +4648,23 @@ export default function CandidateProfilePage() {
                           currentIndustry: e.target.value,
                         })
                       }
-                      className={INPUT_CLASS}
-                    />
+                      className={`${INPUT_CLASS} cursor-pointer`}
+                    >
+                      <option value="">Select industry</option>
+                      {INDUSTRY_OPTIONS.map((ind) => (
+                        <option key={ind} value={ind}>
+                          {ind}
+                        </option>
+                      ))}
+                    </select>
                   </div>
+
+                  {/* 2. Department * */}
                   <div>
-                    <label className={LABEL_CLASS}>Department</label>
-                    <input
-                      type="text"
-                      placeholder="Enter department"
+                    <label className={LABEL_CLASS}>
+                      Department <span className="text-red-500">*</span>
+                    </label>
+                    <select
                       value={careerDraft.department}
                       onChange={(e) =>
                         setCareerDraft({
@@ -2804,14 +4672,23 @@ export default function CandidateProfilePage() {
                           department: e.target.value,
                         })
                       }
-                      className={INPUT_CLASS}
-                    />
+                      className={`${INPUT_CLASS} cursor-pointer`}
+                    >
+                      <option value="">Select department</option>
+                      {DEPARTMENT_OPTIONS.map((dept) => (
+                        <option key={dept} value={dept}>
+                          {dept}
+                        </option>
+                      ))}
+                    </select>
                   </div>
+
+                  {/* 3. Role category * */}
                   <div>
-                    <label className={LABEL_CLASS}>Role Category</label>
-                    <input
-                      type="text"
-                      placeholder="Enter role category"
+                    <label className={LABEL_CLASS}>
+                      Role category <span className="text-red-500">*</span>
+                    </label>
+                    <select
                       value={careerDraft.roleCategory}
                       onChange={(e) =>
                         setCareerDraft({
@@ -2819,14 +4696,23 @@ export default function CandidateProfilePage() {
                           roleCategory: e.target.value,
                         })
                       }
-                      className={INPUT_CLASS}
-                    />
+                      className={`${INPUT_CLASS} cursor-pointer`}
+                    >
+                      <option value="">Select role category</option>
+                      {ROLE_CATEGORY_OPTIONS.map((rc) => (
+                        <option key={rc} value={rc}>
+                          {rc}
+                        </option>
+                      ))}
+                    </select>
                   </div>
+
+                  {/* 4. Job role * */}
                   <div>
-                    <label className={LABEL_CLASS}>Job Role</label>
-                    <input
-                      type="text"
-                      placeholder="Enter job role"
+                    <label className={LABEL_CLASS}>
+                      Job role <span className="text-red-500">*</span>
+                    </label>
+                    <select
                       value={careerDraft.jobRole}
                       onChange={(e) =>
                         setCareerDraft({
@@ -2834,14 +4720,99 @@ export default function CandidateProfilePage() {
                           jobRole: e.target.value,
                         })
                       }
-                      className={INPUT_CLASS}
-                    />
+                      className={`${INPUT_CLASS} cursor-pointer`}
+                    >
+                      <option value="">Select job role</option>
+                      {JOB_ROLE_OPTIONS.map((jr) => (
+                        <option key={jr} value={jr}>
+                          {jr}
+                        </option>
+                      ))}
+                    </select>
                   </div>
+
+                  {/* 5. Desired job type (Checkboxes: Permanent, Contractual) */}
                   <div>
-                    <label className={LABEL_CLASS}>Preferred Job Roles</label>
+                    <label className={LABEL_CLASS}>Desired job type</label>
+                    <div className="flex items-center gap-12 pt-1 text-xs font-semibold text-slate-200">
+                      {(['Permanent', 'Contractual'] as const).map((type) => {
+                        const isChecked = (
+                          careerDraft.desiredJobTypes || []
+                        ).includes(type);
+                        return (
+                          <label
+                            key={type}
+                            className="flex items-center gap-2.5 cursor-pointer"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              onChange={(e) => {
+                                const current =
+                                  careerDraft.desiredJobTypes || [];
+                                const next = e.target.checked
+                                  ? [...current, type]
+                                  : current.filter((t) => t !== type);
+                                setCareerDraft({
+                                  ...careerDraft,
+                                  desiredJobTypes: next,
+                                });
+                              }}
+                              className="w-4 h-4 rounded accent-blue-600 cursor-pointer"
+                            />
+                            <span>{type}</span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* 6. Desired employment type (Checkboxes: Full time, Part time) */}
+                  <div>
+                    <label className={LABEL_CLASS}>
+                      Desired employment type
+                    </label>
+                    <div className="flex items-center gap-12 pt-1 text-xs font-semibold text-slate-200">
+                      {(['Full time', 'Part time'] as const).map((type) => {
+                        const isChecked = (
+                          careerDraft.desiredEmploymentTypes || []
+                        ).includes(type);
+                        return (
+                          <label
+                            key={type}
+                            className="flex items-center gap-2.5 cursor-pointer"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              onChange={(e) => {
+                                const current =
+                                  careerDraft.desiredEmploymentTypes || [];
+                                const next = e.target.checked
+                                  ? [...current, type]
+                                  : current.filter((t) => t !== type);
+                                setCareerDraft({
+                                  ...careerDraft,
+                                  desiredEmploymentTypes: next,
+                                });
+                              }}
+                              className="w-4 h-4 rounded accent-blue-600 cursor-pointer"
+                            />
+                            <span>{type}</span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* 7. Preferred job role (Max 3) */}
+                  <div>
+                    <label className={LABEL_CLASS}>
+                      Preferred job role (Max 3)
+                    </label>
                     <input
                       type="text"
-                      placeholder="Enter preferred job roles"
+                      placeholder="Enter your preferred job role"
                       value={careerDraft.preferredJobRole}
                       onChange={(e) =>
                         setCareerDraft({
@@ -2852,13 +4823,15 @@ export default function CandidateProfilePage() {
                       className={INPUT_CLASS}
                     />
                   </div>
+
+                  {/* 8. Preferred work location (Max 10) */}
                   <div>
                     <label className={LABEL_CLASS}>
-                      Preferred Work Locations
+                      Preferred work location (Max 10)
                     </label>
                     <input
                       type="text"
-                      placeholder="Enter preferred cities"
+                      placeholder="Tell us your location preferences to work"
                       value={careerDraft.preferredLocations}
                       onChange={(e) =>
                         setCareerDraft({
@@ -2869,134 +4842,399 @@ export default function CandidateProfilePage() {
                       className={INPUT_CLASS}
                     />
                   </div>
+
+                  {/* 9. Preferred annual salary */}
                   <div>
                     <label className={LABEL_CLASS}>
-                      Preferred Annual Salary
+                      Preferred annual salary
                     </label>
-                    <input
-                      type="text"
-                      placeholder="Enter expected salary"
-                      value={careerDraft.preferredSalary}
-                      onChange={(e) =>
-                        setCareerDraft({
-                          ...careerDraft,
-                          preferredSalary: e.target.value,
-                        })
-                      }
-                      className={INPUT_CLASS}
-                    />
+                    <div className="flex gap-3">
+                      <select
+                        value={careerDraft.preferredSalaryCurrency || '₹'}
+                        onChange={(e) =>
+                          setCareerDraft({
+                            ...careerDraft,
+                            preferredSalaryCurrency: e.target.value,
+                          })
+                        }
+                        className="w-24 bg-slate-950/90 border border-slate-700/90 rounded-xl px-3.5 py-3.5 text-sm text-white outline-none focus:border-blue-500 cursor-pointer shrink-0"
+                      >
+                        <option value="₹">₹</option>
+                        <option value="$">$</option>
+                      </select>
+
+                      <input
+                        type="text"
+                        placeholder="0"
+                        value={careerDraft.preferredSalary}
+                        onChange={(e) =>
+                          setCareerDraft({
+                            ...careerDraft,
+                            preferredSalary: e.target.value,
+                          })
+                        }
+                        className={INPUT_CLASS}
+                      />
+                    </div>
                   </div>
+
+                  {/* 10. Preferred shift (Pill buttons: Day, Night, Flexible) */}
                   <div>
-                    <label className={LABEL_CLASS}>Preferred Shift</label>
-                    <select
-                      value={careerDraft.preferredShift}
-                      onChange={(e) =>
-                        setCareerDraft({
-                          ...careerDraft,
-                          preferredShift: e.target.value,
-                        })
-                      }
-                      className={INPUT_CLASS}
-                    >
-                      <option value="Day">Day</option>
-                      <option value="Night">Night</option>
-                      <option value="Flexible">Flexible</option>
-                    </select>
+                    <label className={LABEL_CLASS}>Preferred shift</label>
+                    <div className="flex flex-wrap gap-3 pt-1">
+                      {(['Day', 'Night', 'Flexible'] as const).map((shift) => (
+                        <button
+                          key={shift}
+                          type="button"
+                          onClick={() =>
+                            setCareerDraft({
+                              ...careerDraft,
+                              preferredShift: shift,
+                            })
+                          }
+                          className={pillButtonClass(
+                            careerDraft.preferredShift === shift
+                          )}
+                        >
+                          {shift}
+                        </button>
+                      ))}
+                    </div>
                   </div>
+
+                  {careerError && (
+                    <p className="text-red-400 text-xs font-bold bg-red-500/10 px-4 py-3 rounded-xl border border-red-500/20">
+                      {careerError}
+                    </p>
+                  )}
                 </div>
 
-                {renderModalFooter()}
+                {renderModalFooter('Save')}
               </form>
             )}
 
-            {/* MODAL 11: PERSONAL DETAILS */}
+            {/* ================================================================
+                MODAL 11: PERSONAL DETAILS & LANGUAGE PROFICIENCY FORM
+                (Matches Screenshots 2.59.29 & 2.59.35 PM)
+               ================================================================ */}
             {activeModal === 'personal' && (
-              <form
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  saveToDatabase({
-                    ...profile,
-                    personalDetails: personalDraft,
-                  });
-                }}
-              >
+              <form noValidate onSubmit={handleSavePersonalDetails}>
                 <div className="pb-5 mb-7 border-b border-slate-800 pr-12">
                   <h3 className="text-xl font-extrabold text-white">
-                    Edit Personal Details
+                    Personal details
                   </h3>
                   <p className="text-xs text-slate-400 mt-1">
-                    Update your personal and demographic information.
+                    This information is important for employers to know you
+                    better
                   </p>
                 </div>
 
                 <div className="space-y-6">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                    <div>
-                      <label className={LABEL_CLASS}>Gender</label>
-                      <input
-                        type="text"
-                        placeholder="Enter gender"
-                        value={personalDraft.gender}
-                        onChange={(e) =>
-                          setPersonalDraft({
-                            ...personalDraft,
-                            gender: e.target.value,
-                          })
-                        }
-                        className={INPUT_CLASS}
-                      />
-                    </div>
-                    <div>
-                      <label className={LABEL_CLASS}>Marital Status</label>
-                      <input
-                        type="text"
-                        placeholder="Enter marital status"
-                        value={personalDraft.maritalStatus}
-                        onChange={(e) =>
-                          setPersonalDraft({
-                            ...personalDraft,
-                            maritalStatus: e.target.value,
-                          })
-                        }
-                        className={INPUT_CLASS}
-                      />
-                    </div>
-                    <div>
-                      <label className={LABEL_CLASS}>Date of Birth</label>
-                      <input
-                        type="text"
-                        placeholder="DD MMM YYYY"
-                        value={personalDraft.dateOfBirth}
-                        onChange={(e) =>
-                          setPersonalDraft({
-                            ...personalDraft,
-                            dateOfBirth: e.target.value,
-                          })
-                        }
-                        className={INPUT_CLASS}
-                      />
-                    </div>
-                    <div>
-                      <label className={LABEL_CLASS}>Category</label>
-                      <input
-                        type="text"
-                        placeholder="Enter category"
-                        value={personalDraft.category}
-                        onChange={(e) =>
-                          setPersonalDraft({
-                            ...personalDraft,
-                            category: e.target.value,
-                          })
-                        }
-                        className={INPUT_CLASS}
-                      />
+                  {/* 1. Gender (Pills: Male, Female, Transgender) */}
+                  <div>
+                    <label className={LABEL_CLASS}>Gender</label>
+                    <div className="flex flex-wrap gap-3 pt-1">
+                      {(['Male', 'Female', 'Transgender'] as const).map((g) => (
+                        <button
+                          key={g}
+                          type="button"
+                          onClick={() =>
+                            setPersonalDraft({ ...personalDraft, gender: g })
+                          }
+                          className={pillButtonClass(
+                            (personalDraft.gender || '').toLowerCase() ===
+                              g.toLowerCase()
+                          )}
+                        >
+                          {g}
+                        </button>
+                      ))}
                     </div>
                   </div>
+
+                  {/* 2. More information */}
                   <div>
-                    <label className={LABEL_CLASS}>Permanent Address</label>
-                    <textarea
-                      rows={3}
-                      placeholder="Enter permanent address"
+                    <label className="block text-xs font-bold text-slate-200 mb-1">
+                      More information
+                    </label>
+                    <p className="text-xs text-slate-400 mb-3">
+                      Companies are focusing on equal opportunities and might be
+                      looking for candidates from diverse backgrounds.
+                    </p>
+                    <div className="flex flex-wrap gap-2.5">
+                      {(
+                        [
+                          'Single parent',
+                          'Working mother',
+                          'Retired (60+)',
+                          'LGBTQ+',
+                        ] as const
+                      ).map((info) => {
+                        const isSelected = (
+                          personalDraft.moreInfo || []
+                        ).includes(info);
+                        return (
+                          <button
+                            key={info}
+                            type="button"
+                            onClick={() => {
+                              const current = personalDraft.moreInfo || [];
+                              const next = isSelected
+                                ? current.filter((item) => item !== info)
+                                : [...current, info];
+                              setPersonalDraft({
+                                ...personalDraft,
+                                moreInfo: next,
+                              });
+                            }}
+                            className={pillButtonClass(isSelected)}
+                          >
+                            {info} {isSelected ? '✓' : '+'}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* 3. Marital status */}
+                  <div>
+                    <label className={LABEL_CLASS}>Marital status</label>
+                    <div className="flex flex-wrap gap-2.5 pt-1">
+                      {(
+                        [
+                          'Single/unmarried',
+                          'Married',
+                          'Widowed',
+                          'Divorced',
+                          'Separated',
+                          'Other',
+                        ] as const
+                      ).map((ms) => (
+                        <button
+                          key={ms}
+                          type="button"
+                          onClick={() =>
+                            setPersonalDraft({
+                              ...personalDraft,
+                              maritalStatus: ms,
+                            })
+                          }
+                          className={pillButtonClass(
+                            (
+                              personalDraft.maritalStatus || ''
+                            ).toLowerCase() === ms.toLowerCase()
+                          )}
+                        >
+                          {ms}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* 4. Date of birth (DD / MM / YYYY) */}
+                  <div>
+                    <label className={LABEL_CLASS}>Date of birth</label>
+                    <div className="grid grid-cols-3 gap-4">
+                      <select
+                        value={personalDraft.dobDay || ''}
+                        onChange={(e) =>
+                          setPersonalDraft({
+                            ...personalDraft,
+                            dobDay: e.target.value,
+                          })
+                        }
+                        className={`${INPUT_CLASS} cursor-pointer`}
+                      >
+                        <option value="">DD</option>
+                        {DAYS_LIST.map((d) => (
+                          <option key={d} value={d}>
+                            {d}
+                          </option>
+                        ))}
+                      </select>
+
+                      <select
+                        value={personalDraft.dobMonth || ''}
+                        onChange={(e) =>
+                          setPersonalDraft({
+                            ...personalDraft,
+                            dobMonth: e.target.value,
+                          })
+                        }
+                        className={`${INPUT_CLASS} cursor-pointer`}
+                      >
+                        <option value="">MM</option>
+                        {MONTHS_LIST.map((m) => (
+                          <option key={m} value={m}>
+                            {m}
+                          </option>
+                        ))}
+                      </select>
+
+                      <select
+                        value={personalDraft.dobYear || ''}
+                        onChange={(e) =>
+                          setPersonalDraft({
+                            ...personalDraft,
+                            dobYear: e.target.value,
+                          })
+                        }
+                        className={`${INPUT_CLASS} cursor-pointer`}
+                      >
+                        <option value="">YYYY</option>
+                        {DOB_YEARS_LIST.map((yr) => (
+                          <option key={yr} value={yr}>
+                            {yr}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* 5. Category */}
+                  <div>
+                    <label className="block text-xs font-bold text-slate-200 mb-1">
+                      Category
+                    </label>
+                    <p className="text-xs text-slate-400 mb-3">
+                      Companies welcome people from various categories to bring
+                      equality among all citizens
+                    </p>
+                    <div className="flex flex-wrap gap-2.5">
+                      {(
+                        [
+                          'General',
+                          'Scheduled Caste (SC)',
+                          'Scheduled Tribe (ST)',
+                          'OBC - Creamy',
+                          'OBC - Non creamy',
+                          'Other',
+                        ] as const
+                      ).map((cat) => (
+                        <button
+                          key={cat}
+                          type="button"
+                          onClick={() =>
+                            setPersonalDraft({
+                              ...personalDraft,
+                              category: cat,
+                            })
+                          }
+                          className={pillButtonClass(
+                            personalDraft.category === cat
+                          )}
+                        >
+                          {cat}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* 6. Work permit for USA */}
+                  <div>
+                    <label className={LABEL_CLASS}>Work permit for USA</label>
+                    <div className="flex flex-wrap gap-2.5 pt-1">
+                      {(
+                        [
+                          'Have US H1 Visa',
+                          'Need US H1 Visa',
+                          'US TN Permit Holder',
+                          'US Green Card Holder',
+                          'US Citizen',
+                          'Authorized to work in US',
+                        ] as const
+                      ).map((usaOption) => (
+                        <button
+                          key={usaOption}
+                          type="button"
+                          onClick={() =>
+                            setPersonalDraft({
+                              ...personalDraft,
+                              workPermitUsa:
+                                personalDraft.workPermitUsa === usaOption
+                                  ? ''
+                                  : usaOption,
+                            })
+                          }
+                          className={pillButtonClass(
+                            personalDraft.workPermitUsa === usaOption
+                          )}
+                        >
+                          {usaOption}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* 7. Work permit for other countries (Max 3) */}
+                  <div>
+                    <label className={LABEL_CLASS}>
+                      Work permit for other countries
+                    </label>
+                    <select
+                      value=""
+                      onChange={(e) => {
+                        const selected = e.target.value;
+                        if (!selected) return;
+                        const current =
+                          personalDraft.workPermitCountries || [];
+                        if (
+                          !current.includes(selected) &&
+                          current.length < 3
+                        ) {
+                          setPersonalDraft({
+                            ...personalDraft,
+                            workPermitCountries: [...current, selected],
+                          });
+                        }
+                      }}
+                      className={`${INPUT_CLASS} cursor-pointer`}
+                    >
+                      <option value="">Select countries</option>
+                      {COUNTRIES_LIST.map((c) => (
+                        <option key={c} value={c}>
+                          {c}
+                        </option>
+                      ))}
+                    </select>
+                    <p className="text-[11px] text-slate-400 mt-1.5">
+                      You can choose 3 countries at max
+                    </p>
+
+                    {(personalDraft.workPermitCountries || []).length > 0 && (
+                      <div className="flex flex-wrap gap-2 mt-2.5">
+                        {(personalDraft.workPermitCountries || []).map((c) => (
+                          <span
+                            key={c}
+                            className="px-3.5 py-1.5 rounded-full bg-slate-800 border border-slate-700 text-xs font-semibold text-white flex items-center gap-2"
+                          >
+                            <span>{c}</span>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setPersonalDraft({
+                                  ...personalDraft,
+                                  workPermitCountries: (
+                                    personalDraft.workPermitCountries || []
+                                  ).filter((item) => item !== c),
+                                })
+                              }
+                              className="text-slate-400 hover:text-red-400 cursor-pointer"
+                            >
+                              ✕
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 8. Permanent address */}
+                  <div>
+                    <label className={LABEL_CLASS}>Permanent address</label>
+                    <input
+                      type="text"
+                      placeholder="Enter your permanent address"
                       value={personalDraft.address}
                       onChange={(e) =>
                         setPersonalDraft({
@@ -3004,209 +5242,340 @@ export default function CandidateProfilePage() {
                           address: e.target.value,
                         })
                       }
-                      className={`${INPUT_CLASS} leading-relaxed`}
+                      className={INPUT_CLASS}
                     />
                   </div>
-                </div>
 
-                {renderModalFooter()}
-              </form>
-            )}
-
-            {/* MODAL 12: LANGUAGES */}
-            {activeModal === 'language' && (
-              <form
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  const entry = {
-                    ...languageDraft,
-                    id: String(Date.now()),
-                  };
-                  saveToDatabase({
-                    ...profile,
-                    languages: [...profile.languages, entry],
-                  });
-                }}
-              >
-                <div className="pb-5 mb-7 border-b border-slate-800 pr-12">
-                  <h3 className="text-xl font-extrabold text-white">
-                    Add Language
-                  </h3>
-                  <p className="text-xs text-slate-400 mt-1">
-                    Add languages you know along with your reading, writing, and
-                    speaking proficiency.
-                  </p>
-                </div>
-
-                <div className="space-y-6">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                    <div>
-                      <label className={LABEL_CLASS}>Language *</label>
-                      <input
-                        type="text"
-                        required
-                        placeholder="Enter language"
-                        value={languageDraft.language}
-                        onChange={(e) =>
-                          setLanguageDraft({
-                            ...languageDraft,
-                            language: e.target.value,
-                          })
-                        }
-                        className={INPUT_CLASS}
-                      />
-                    </div>
-                    <div>
-                      <label className={LABEL_CLASS}>Proficiency</label>
-                      <select
-                        value={languageDraft.proficiency}
-                        onChange={(e) =>
-                          setLanguageDraft({
-                            ...languageDraft,
-                            proficiency: e.target.value,
-                          })
-                        }
-                        className={INPUT_CLASS}
-                      >
-                        <option value="Beginner">Beginner</option>
-                        <option value="Proficient">Proficient</option>
-                        <option value="Expert">Expert</option>
-                      </select>
-                    </div>
-                  </div>
-
+                  {/* 9. Hometown */}
                   <div>
-                    <label className={LABEL_CLASS}>Skills</label>
-                    <div className="flex items-center gap-8 pt-1 text-sm text-slate-200">
-                      <label className="flex items-center gap-2.5 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={languageDraft.read}
-                          onChange={(e) =>
-                            setLanguageDraft({
-                              ...languageDraft,
-                              read: e.target.checked,
-                            })
-                          }
-                          className="w-4 h-4 rounded accent-blue-600 cursor-pointer"
-                        />
-                        <span>Read</span>
-                      </label>
-                      <label className="flex items-center gap-2.5 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={languageDraft.write}
-                          onChange={(e) =>
-                            setLanguageDraft({
-                              ...languageDraft,
-                              write: e.target.checked,
-                            })
-                          }
-                          className="w-4 h-4 rounded accent-blue-600 cursor-pointer"
-                        />
-                        <span>Write</span>
-                      </label>
-                      <label className="flex items-center gap-2.5 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={languageDraft.speak}
-                          onChange={(e) =>
-                            setLanguageDraft({
-                              ...languageDraft,
-                              speak: e.target.checked,
-                            })
-                          }
-                          className="w-4 h-4 rounded accent-blue-600 cursor-pointer"
-                        />
-                        <span>Speak</span>
-                      </label>
+                    <label className={LABEL_CLASS}>Hometown</label>
+                    <input
+                      type="text"
+                      placeholder="Enter your hometown"
+                      value={personalDraft.hometown || ''}
+                      onChange={(e) =>
+                        setPersonalDraft({
+                          ...personalDraft,
+                          hometown: e.target.value,
+                        })
+                      }
+                      className={INPUT_CLASS}
+                    />
+                  </div>
+
+                  {/* 10. Pincode */}
+                  <div>
+                    <label className={LABEL_CLASS}>Pincode</label>
+                    <input
+                      type="text"
+                      maxLength={6}
+                      placeholder="Enter your Pincode"
+                      value={personalDraft.pincode || ''}
+                      onChange={(e) =>
+                        setPersonalDraft({
+                          ...personalDraft,
+                          pincode: e.target.value.replace(/\D/g, ''),
+                        })
+                      }
+                      className={INPUT_CLASS}
+                    />
+                  </div>
+
+                  {/* 11. Language proficiency section */}
+                  <div className="pt-4 border-t border-slate-800">
+                    <h4 className="text-base font-extrabold text-white">
+                      Language proficiency
+                    </h4>
+                    <p className="text-xs text-slate-400 mt-0.5 mb-5">
+                      Strengthen your resume by letting recruiters know you can
+                      communicate in multiple languages
+                    </p>
+
+                    <div className="space-y-6">
+                      {languagesDraft.map((langRow, idx) => (
+                        <div
+                          key={langRow.id}
+                          className="space-y-3 pb-4 border-b border-slate-800/60 last:border-b-0"
+                        >
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div>
+                              <label className={LABEL_CLASS}>
+                                Language <span className="text-red-500">*</span>
+                              </label>
+                              <select
+                                value={langRow.language}
+                                onChange={(e) => {
+                                  const next = [...languagesDraft];
+                                  next[idx] = {
+                                    ...next[idx],
+                                    language: e.target.value,
+                                  };
+                                  setLanguagesDraft(next);
+                                }}
+                                className={`${INPUT_CLASS} cursor-pointer`}
+                              >
+                                <option value="">Select language</option>
+                                {LANGUAGE_OPTIONS.map((l) => (
+                                  <option key={l} value={l}>
+                                    {l}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+
+                            <div>
+                              <label className={LABEL_CLASS}>
+                                Proficiency{' '}
+                                <span className="text-red-500">*</span>
+                              </label>
+                              <select
+                                value={langRow.proficiency}
+                                onChange={(e) => {
+                                  const next = [...languagesDraft];
+                                  next[idx] = {
+                                    ...next[idx],
+                                    proficiency: e.target.value,
+                                  };
+                                  setLanguagesDraft(next);
+                                }}
+                                className={`${INPUT_CLASS} cursor-pointer`}
+                              >
+                                <option value="">Select proficiency</option>
+                                <option value="Beginner">Beginner</option>
+                                <option value="Proficient">Proficient</option>
+                                <option value="Expert">Expert</option>
+                              </select>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center justify-between pt-1">
+                            <div className="flex items-center gap-8 text-xs font-semibold text-slate-300">
+                              <label className="flex items-center gap-2 cursor-pointer">
+                                <input
+                                  type="checkbox"
+                                  checked={langRow.read}
+                                  onChange={(e) => {
+                                    const next = [...languagesDraft];
+                                    next[idx] = {
+                                      ...next[idx],
+                                      read: e.target.checked,
+                                    };
+                                    setLanguagesDraft(next);
+                                  }}
+                                  className="w-4 h-4 rounded accent-blue-600 cursor-pointer"
+                                />
+                                <span>Read</span>
+                              </label>
+
+                              <label className="flex items-center gap-2 cursor-pointer">
+                                <input
+                                  type="checkbox"
+                                  checked={langRow.write}
+                                  onChange={(e) => {
+                                    const next = [...languagesDraft];
+                                    next[idx] = {
+                                      ...next[idx],
+                                      write: e.target.checked,
+                                    };
+                                    setLanguagesDraft(next);
+                                  }}
+                                  className="w-4 h-4 rounded accent-blue-600 cursor-pointer"
+                                />
+                                <span>Write</span>
+                              </label>
+
+                              <label className="flex items-center gap-2 cursor-pointer">
+                                <input
+                                  type="checkbox"
+                                  checked={langRow.speak}
+                                  onChange={(e) => {
+                                    const next = [...languagesDraft];
+                                    next[idx] = {
+                                      ...next[idx],
+                                      speak: e.target.checked,
+                                    };
+                                    setLanguagesDraft(next);
+                                  }}
+                                  className="w-4 h-4 rounded accent-blue-600 cursor-pointer"
+                                />
+                                <span>Speak</span>
+                              </label>
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (languagesDraft.length === 1) {
+                                  setLanguagesDraft([
+                                    {
+                                      id: String(Date.now()),
+                                      language: '',
+                                      proficiency: '',
+                                      read: false,
+                                      write: false,
+                                      speak: false,
+                                    },
+                                  ]);
+                                } else {
+                                  setLanguagesDraft(
+                                    languagesDraft.filter(
+                                      (_, itemIdx) => itemIdx !== idx
+                                    )
+                                  );
+                                }
+                              }}
+                              className="text-xs font-extrabold text-blue-400 hover:text-red-400 cursor-pointer"
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        </div>
+                      ))}
                     </div>
+
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setLanguagesDraft([
+                          ...languagesDraft,
+                          {
+                            id: String(Date.now() + Math.random()),
+                            language: '',
+                            proficiency: '',
+                            read: false,
+                            write: false,
+                            speak: false,
+                          },
+                        ])
+                      }
+                      className="mt-4 text-xs font-extrabold text-blue-400 hover:text-blue-300 cursor-pointer"
+                    >
+                      Add another language
+                    </button>
                   </div>
                 </div>
 
-                {renderModalFooter()}
+                {renderModalFooter('Save')}
               </form>
             )}
 
-            {/* MODAL 13: DIVERSITY & INCLUSION */}
+            {/* ================================================================
+                MODAL 12: DIVERSITY & INCLUSION FORM (Matches Screenshot 2.59.57 PM)
+               ================================================================ */}
             {activeModal === 'diversity' && (
               <form
                 onSubmit={(e) => {
                   e.preventDefault();
-                  saveToDatabase({ ...profile, diversity: diversityDraft });
+                  saveToDatabase(
+                    { ...profile, diversity: diversityDraft },
+                    {},
+                    'Diversity & inclusion updated!'
+                  );
                 }}
               >
                 <div className="pb-5 mb-7 border-b border-slate-800 pr-12">
                   <h3 className="text-xl font-extrabold text-white">
-                    Diversity &amp; Inclusion
+                    Diversity &amp; inclusion
                   </h3>
                   <p className="text-xs text-slate-400 mt-1">
-                    Share details to connect with inclusive employers.
+                    Share details to attract recruiters who value people from
+                    different backgrounds
                   </p>
                 </div>
 
                 <div className="space-y-6">
+                  {/* 1. Disability status */}
                   <div>
-                    <label className={LABEL_CLASS}>Disability Status</label>
-                    <select
-                      value={diversityDraft.disabilityStatus}
-                      onChange={(e) =>
-                        setDiversityDraft({
-                          ...diversityDraft,
-                          disabilityStatus: e.target.value,
-                        })
-                      }
-                      className={INPUT_CLASS}
-                    >
-                      <option value="Do not have disability">
-                        Do not have disability
-                      </option>
-                      <option value="Have disability">Have disability</option>
-                      <option value="Prefer not to say">
-                        Prefer not to say
-                      </option>
-                    </select>
+                    <label className="block text-xs font-bold text-slate-200 mb-1">
+                      Disability status
+                    </label>
+                    <p className="text-xs text-slate-400 mb-3">
+                      Share your status to get jobs that match your needs
+                    </p>
+                    <div className="flex flex-wrap gap-3">
+                      {(
+                        ['Have disability', 'Do not have disability'] as const
+                      ).map((status) => (
+                        <button
+                          key={status}
+                          type="button"
+                          onClick={() =>
+                            setDiversityDraft({
+                              ...diversityDraft,
+                              disabilityStatus: status,
+                            })
+                          }
+                          className={pillButtonClass(
+                            diversityDraft.disabilityStatus === status
+                          )}
+                        >
+                          {status}
+                        </button>
+                      ))}
+                    </div>
                   </div>
+
+                  {/* 2. Military experience */}
                   <div>
-                    <label className={LABEL_CLASS}>Military Experience</label>
-                    <select
-                      value={diversityDraft.militaryExperience}
-                      onChange={(e) =>
-                        setDiversityDraft({
-                          ...diversityDraft,
-                          militaryExperience: e.target.value,
-                        })
-                      }
-                      className={INPUT_CLASS}
-                    >
-                      <option value="Never served">Never served</option>
-                      <option value="Currently serving">
-                        Currently serving
-                      </option>
-                      <option value="Veteran">Veteran</option>
-                    </select>
+                    <label className={LABEL_CLASS}>Military experience</label>
+                    <div className="flex flex-wrap gap-3 pt-1">
+                      {(
+                        [
+                          'Currently serving',
+                          'Previously served',
+                          'Never served',
+                        ] as const
+                      ).map((mil) => (
+                        <button
+                          key={mil}
+                          type="button"
+                          onClick={() =>
+                            setDiversityDraft({
+                              ...diversityDraft,
+                              militaryExperience: mil,
+                            })
+                          }
+                          className={pillButtonClass(
+                            diversityDraft.militaryExperience === mil
+                          )}
+                        >
+                          {mil}
+                        </button>
+                      ))}
+                    </div>
                   </div>
+
+                  {/* 3. Career break */}
                   <div>
-                    <label className={LABEL_CLASS}>Career Break</label>
-                    <select
-                      value={diversityDraft.careerBreak}
-                      onChange={(e) =>
-                        setDiversityDraft({
-                          ...diversityDraft,
-                          careerBreak: e.target.value,
-                        })
-                      }
-                      className={INPUT_CLASS}
-                    >
-                      <option value="Have not taken">Have not taken</option>
-                      <option value="Have taken a career break">
-                        Have taken a career break
-                      </option>
-                    </select>
+                    <label className="block text-xs font-bold text-slate-200 mb-1">
+                      Career break
+                    </label>
+                    <p className="text-xs text-slate-400 mb-3">
+                      Help recruiters understand your unique path
+                    </p>
+                    <div className="flex flex-wrap gap-3">
+                      {(['Have taken', 'Have not taken'] as const).map((cb) => (
+                        <button
+                          key={cb}
+                          type="button"
+                          onClick={() =>
+                            setDiversityDraft({
+                              ...diversityDraft,
+                              careerBreak: cb,
+                            })
+                          }
+                          className={pillButtonClass(
+                            diversityDraft.careerBreak === cb
+                          )}
+                        >
+                          {cb}
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 </div>
 
-                {renderModalFooter()}
+                {renderModalFooter('Save')}
               </form>
             )}
           </div>
