@@ -274,7 +274,6 @@ export default function Header({ accentColor, isGlobal = false }: HeaderProps) {
                       >
                         Post an Internship
                       </Link>
-                      {/* ROUTES DIRECTLY TO /employer/jobs (Manage Jobs and Responses) */}
                       <Link
                         href="/employer/jobs"
                         onClick={() => setActiveEmployerMenu(null)}
@@ -561,19 +560,13 @@ export default function Header({ accentColor, isGlobal = false }: HeaderProps) {
                 </div>
               </>
             ) : (
-              /* LOGGED OUT ACTIONS */
-              <div className="flex items-center gap-5 pl-5 border-l border-slate-700">
+              /* LOGGED OUT ACTIONS (Removed 'Register' button & 'Employer Login' dropdown item) */
+              <div className="flex items-center gap-6 pl-5 border-l border-slate-700">
                 <Link
                   href="/login"
                   className="text-sm font-bold text-slate-300 hover:text-white transition-colors"
                 >
                   Login
-                </Link>
-                <Link
-                  href="/register"
-                  className="px-5 py-2.5 rounded-full bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs uppercase tracking-wider transition shadow-md"
-                >
-                  Register
                 </Link>
 
                 <div
@@ -598,12 +591,6 @@ export default function Header({ accentColor, isGlobal = false }: HeaderProps) {
                         className="block px-4 py-2.5 text-xs font-bold text-slate-300 hover:bg-slate-700 hover:text-white"
                       >
                         Naukri Talent Cloud
-                      </Link>
-                      <Link
-                        href="/login"
-                        className="block px-4 py-2.5 text-xs font-bold text-slate-300 hover:bg-slate-700 hover:text-white"
-                      >
-                        Employer Login
                       </Link>
                     </div>
                   )}

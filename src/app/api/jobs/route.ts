@@ -207,3 +207,48 @@ export async function PATCH(request: Request) {
     );
   }
 }
+
+export async function DELETE(request: Request) {
+  try {
+    const { searchParams } = new URL(request.url);
+    let id = searchParams.get('id');
+
+    if (!id) {
+      try {
+        const body = await request.json();
+        if (body.id) id = String(body.id);
+      } catch {}
+    }
+
+    if (!id) {
+      return NextResponse.json(
+        { error: 'Job ID is required to delete job posting.' },
+        { status: 400 }
+      );
+    }
+
+    const jobId = Number(id);
+    const sql = neon(process.env.DATABASE_URL!);
+
+    // Clean up any dependent applications or saved jobs first
+    try {
+      await sql`DELETE FROM job_applications WHERE job_id = ${jobId}`;
+    } catch {}
+    try {
+      await sql`DELETE FROM saved_jobs WHERE job_id = ${jobId}`;
+    } catch {}
+
+    await sql`DELETE FROM jobs WHERE id = ${jobId}`;
+
+    return NextResponse.json({
+      success: true,
+      message: 'Job posting deleted successfully.',
+    });
+  } catch (error: any) {
+    console.error('DELETE /api/jobs error:', error);
+    return NextResponse.json(
+      { error: error?.message || 'Failed to delete job posting' },
+      { status: 500 }
+    );
+  }
+}

@@ -23,6 +23,10 @@ export default function ManageJobsAndResponsesPage() {
   const [jobs, setJobs] = useState<EmployerJob[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Delete Confirmation Modal States
+  const [jobToDelete, setJobToDelete] = useState<EmployerJob | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
   // Top-right "Post job" dropdown state
   const [showPostJobMenu, setShowPostJobMenu] = useState(false);
   const postJobMenuRef = useRef<HTMLDivElement>(null);
@@ -85,23 +89,54 @@ export default function ManageJobsAndResponsesPage() {
       .finally(() => setLoading(false));
   }, []);
 
-  // Update job status (ACTIVE / CLOSED / EXPIRED) in Neon DB
-  const handleStatusChange = async (
-    jobId: number,
-    newStatus: 'ACTIVE' | 'CLOSED' | 'EXPIRED'
+  // Handle dropdown selection (Active / Closed / Expired / Delete)
+  const handleDropdownAction = async (
+    job: EmployerJob,
+    selectedValue: string
   ) => {
+    if (selectedValue === 'DELETE') {
+      // Open Yes / No confirmation modal without changing current status
+      setJobToDelete(job);
+      return;
+    }
+
+    const newStatus = selectedValue as 'ACTIVE' | 'CLOSED' | 'EXPIRED';
     setJobs((prev) =>
-      prev.map((j) => (j.id === jobId ? { ...j, status: newStatus } : j))
+      prev.map((j) => (j.id === job.id ? { ...j, status: newStatus } : j))
     );
 
     try {
       await fetch('/api/jobs', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: jobId, status: newStatus }),
+        body: JSON.stringify({ id: job.id, status: newStatus }),
       });
     } catch (err) {
       console.error('Failed to update job status:', err);
+    }
+  };
+
+  // Confirm "Yes" to delete the job from Neon DB and revert to screen
+  const handleConfirmDeleteJob = async () => {
+    if (!jobToDelete) return;
+    setDeleting(true);
+
+    try {
+      const res = await fetch(
+        `/api/jobs?id=${encodeURIComponent(jobToDelete.id)}`,
+        {
+          method: 'DELETE',
+        }
+      );
+
+      if (res.ok) {
+        setJobs((prev) => prev.filter((j) => j.id !== jobToDelete.id));
+      }
+    } catch (err) {
+      console.error('Failed to delete job:', err);
+    } finally {
+      setDeleting(false);
+      setJobToDelete(null);
     }
   };
 
@@ -145,6 +180,13 @@ export default function ManageJobsAndResponsesPage() {
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 font-sans py-10 px-6 md:px-12">
+      <style>{`
+        @keyframes shimmer {
+          0% { transform: translateX(-100%); }
+          100% { transform: translateX(100%); }
+        }
+      `}</style>
+
       <div className="max-w-7xl mx-auto">
         {/* ================================================================
             TOP HEADER ROW: TITLE + "POST JOB" DROPDOWN BUTTON
@@ -351,9 +393,9 @@ export default function ManageJobsAndResponsesPage() {
             </div>
           </aside>
 
-          {/* RIGHT MAIN PANEL: "ALL JOBS" TAB (NO DRAFTS) + CONTENT */}
+          {/* RIGHT MAIN PANEL: "ALL JOBS" TAB + CONTENT */}
           <div className="lg:col-span-9">
-            {/* Top Tab Bar (Only "All Jobs", no "Drafts") */}
+            {/* Top Tab Bar (Only "All Jobs") */}
             <div className="border-b border-slate-800 mb-6 flex items-center">
               <div className="pb-3 border-b-2 border-rose-500 text-xs font-extrabold text-white">
                 All Jobs {filteredJobs.length}
@@ -365,11 +407,8 @@ export default function ManageJobsAndResponsesPage() {
                 Loading your job postings...
               </div>
             ) : filteredJobs.length === 0 ? (
-              /* ============================================================
-                 EMPTY STATE (Matches Screenshot 10.18.09 PM)
-                 ============================================================ */
+              /* EMPTY STATE */
               <div className="bg-slate-900 border border-slate-800 rounded-2xl py-16 px-6 text-center shadow-xl">
-                {/* Illustration */}
                 <div className="w-44 h-40 mx-auto mb-6 rounded-full bg-slate-800/50 border border-slate-800 flex flex-col items-center justify-center relative">
                   <svg
                     className="w-24 h-24 text-blue-400"
@@ -404,9 +443,7 @@ export default function ManageJobsAndResponsesPage() {
                 </Link>
               </div>
             ) : (
-              /* ============================================================
-                 POPULATED JOB LISTINGS & RESPONSES
-                 ============================================================ */
+              /* POPULATED JOB LISTINGS & RESPONSES */
               <div className="space-y-4">
                 {filteredJobs.map((job) => {
                   const status = (job.status || 'ACTIVE').toUpperCase();
@@ -455,21 +492,21 @@ export default function ManageJobsAndResponsesPage() {
                         </div>
                       </div>
 
-                      {/* Right Actions: Status Switcher & View Responses */}
+                      {/* Right Actions: Status & Delete Dropdown + View Responses */}
                       <div className="flex flex-wrap items-center gap-3 shrink-0">
                         <select
                           value={status}
                           onChange={(e) =>
-                            handleStatusChange(
-                              job.id,
-                              e.target.value as 'ACTIVE' | 'CLOSED' | 'EXPIRED'
-                            )
+                            handleDropdownAction(job, e.target.value)
                           }
-                          className="bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs font-bold text-slate-200 outline-none focus:border-blue-500 cursor-pointer"
+                          className="bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2 text-xs font-bold text-slate-200 outline-none focus:border-blue-500 cursor-pointer"
                         >
                           <option value="ACTIVE">Active</option>
                           <option value="CLOSED">Closed</option>
                           <option value="EXPIRED">Expired</option>
+                          <option value="DELETE" className="text-red-400">
+                            Delete
+                          </option>
                         </select>
 
                         <Link
@@ -487,6 +524,66 @@ export default function ManageJobsAndResponsesPage() {
           </div>
         </div>
       </div>
+
+      {/* ================================================================
+          DELETE JOB CONFIRMATION MODAL (YES / NO)
+         ================================================================ */}
+      {jobToDelete && (
+        <div
+          className="fixed inset-0 z-[999999] bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4"
+          onClick={() => {
+            if (!deleting) setJobToDelete(null);
+          }}
+        >
+          <div
+            className="bg-slate-900 border border-slate-700 rounded-3xl max-w-md w-full p-7 sm:p-8 shadow-2xl text-center relative"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="w-14 h-14 rounded-2xl bg-red-500/15 border border-red-500/30 text-red-400 flex items-center justify-center text-2xl mx-auto mb-4">
+              🗑️
+            </div>
+
+            <h3 className="text-xl font-extrabold text-white">
+              Delete Job Posting?
+            </h3>
+            <p className="text-xs sm:text-sm text-slate-300 mt-2 leading-relaxed">
+              Are you sure you want to delete{' '}
+              <strong className="text-white">{jobToDelete.title}</strong> (Ref
+              ID: RM-{jobToDelete.id})?
+            </p>
+
+            <div className="mt-7 flex items-center justify-center gap-3.5">
+              {/* NO BUTTON: Reverts to screen without deleting */}
+              <button
+                type="button"
+                disabled={deleting}
+                onClick={() => setJobToDelete(null)}
+                className="flex-1 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-extrabold uppercase tracking-wider text-slate-200 hover:text-white transition cursor-pointer"
+              >
+                No
+              </button>
+
+              {/* YES BUTTON: Deletes job from DB and reverts to screen */}
+              <button
+                type="button"
+                disabled={deleting}
+                onClick={handleConfirmDeleteJob}
+                className="relative overflow-hidden flex-1 py-3 rounded-xl bg-red-600 hover:bg-red-500 disabled:bg-red-600/60 text-xs font-extrabold uppercase tracking-wider text-white shadow-lg shadow-red-600/25 transition cursor-pointer"
+              >
+                {deleting && (
+                  <div
+                    className="absolute inset-0 w-full h-full bg-gradient-to-r from-transparent via-white/25 to-transparent -skew-x-12"
+                    style={{ animation: 'shimmer 1.5s infinite' }}
+                  />
+                )}
+                <span className="relative z-10">
+                  {deleting ? 'Deleting...' : 'Yes'}
+                </span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
