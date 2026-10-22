@@ -1,6 +1,10 @@
 import { NextResponse } from 'next/server';
-import { neon } from '@neondatabase/serverless';
 import { UTApi } from 'uploadthing/server';
+import {
+  sql,
+  safeString,
+  validateAndDecodeBase64File,
+} from '../../../utils/db';
 
 const utapi = new UTApi();
 
@@ -10,7 +14,34 @@ function extractFileKey(value: unknown): string | null {
   return match && match[1] ? match[1] : null;
 }
 
-async function ensureCandidateColumns(sql: any) {
+async function ensureCandidateColumns() {
+  await sql`
+    CREATE TABLE IF NOT EXISTS candidate_profiles (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER UNIQUE,
+      name VARCHAR(255),
+      phone VARCHAR(50),
+      location VARCHAR(255),
+      work_status VARCHAR(50) DEFAULT 'experienced',
+      role VARCHAR(255),
+      headline TEXT,
+      company VARCHAR(255),
+      experience VARCHAR(100),
+      salary VARCHAR(100),
+      notice_period VARCHAR(100),
+      bio TEXT,
+      skills TEXT,
+      education TEXT,
+      college VARCHAR(255),
+      avatar TEXT,
+      resume_url TEXT,
+      resume_name TEXT,
+      resume_updated_at VARCHAR(100),
+      profile_data TEXT,
+      updated_at VARCHAR(100)
+    )
+  `;
+
   await sql`
     ALTER TABLE candidate_profiles
       ADD COLUMN IF NOT EXISTS name VARCHAR(255),
@@ -39,17 +70,16 @@ async function ensureCandidateColumns(sql: any) {
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
-    const email = searchParams.get('email');
+    const email = safeString(searchParams.get('email'), 254).toLowerCase();
 
     if (!email) {
       return NextResponse.json({ error: 'Email is required' }, { status: 400 });
     }
 
-    const sql = neon(process.env.DATABASE_URL!);
-    await ensureCandidateColumns(sql);
+    await ensureCandidateColumns();
 
     const users = await sql`
-      SELECT id, email, role FROM users WHERE LOWER(TRIM(email)) = LOWER(TRIM(${email})) LIMIT 1
+      SELECT id, email, role FROM users WHERE LOWER(TRIM(email)) = ${email} LIMIT 1
     `;
 
     if (users.length === 0) {
@@ -197,17 +227,16 @@ export async function GET(request: Request) {
 async function handleSaveProfile(request: Request) {
   try {
     const body = await request.json();
-    const email = body.email;
+    const email = safeString(body?.email, 254).toLowerCase();
 
     if (!email) {
       return NextResponse.json({ error: 'Email is required' }, { status: 400 });
     }
 
-    const sql = neon(process.env.DATABASE_URL!);
-    await ensureCandidateColumns(sql);
+    await ensureCandidateColumns();
 
     const users = await sql`
-      SELECT id, email FROM users WHERE LOWER(TRIM(email)) = LOWER(TRIM(${email})) LIMIT 1
+      SELECT id, email FROM users WHERE LOWER(TRIM(email)) = ${email} LIMIT 1
     `;
 
     if (users.length === 0) {
@@ -233,29 +262,37 @@ async function handleSaveProfile(request: Request) {
       }
     }
 
-    // 1. Handle Avatar upload to UploadThing if base64 provided
+    // 1. Validate & Upload Avatar to UploadThing if base64 provided
     let avatarUrl = body.avatar ?? existing.avatar ?? '';
-    if (body.avatarBase64 && body.avatarFileName) {
-      try {
-        const matches = String(body.avatarBase64).match(
-          /^data:(.+);base64,(.+)$/
+    if (body.avatarBase64) {
+      const validation = validateAndDecodeBase64File(
+        body.avatarBase64,
+        body.avatarFileName || 'avatar.png',
+        'avatar'
+      );
+
+      if (!validation.valid || !validation.buffer || !validation.safeFileName) {
+        return NextResponse.json(
+          { error: validation.error || 'Invalid profile photo upload.' },
+          { status: 400 }
         );
-        if (matches && matches.length === 3) {
-          const buffer = Buffer.from(matches[2], 'base64');
-          const fileObj = new File([buffer], body.avatarFileName, {
-            type: matches[1],
-          });
-          const uploadRes = await utapi.uploadFiles(fileObj);
-          const item = Array.isArray(uploadRes) ? uploadRes[0] : uploadRes;
-          if (item?.data) {
-            avatarUrl =
-              (item.data as any).ufsUrl || item.data.url || avatarUrl;
-            const oldKey = extractFileKey(existing.avatar);
-            if (oldKey) {
-              try {
-                await utapi.deleteFiles(oldKey);
-              } catch {}
-            }
+      }
+
+      try {
+        const fileObj = new File(
+          [new Uint8Array(validation.buffer)],
+          validation.safeFileName,
+          { type: validation.mimeType }
+        );
+        const uploadRes = await utapi.uploadFiles(fileObj);
+        const item = Array.isArray(uploadRes) ? uploadRes[0] : uploadRes;
+        if (item?.data) {
+          avatarUrl = (item.data as any).ufsUrl || item.data.url || avatarUrl;
+          const oldKey = extractFileKey(existing.avatar);
+          if (oldKey) {
+            try {
+              await utapi.deleteFiles(oldKey);
+            } catch {}
           }
         }
       } catch (e) {
@@ -263,7 +300,7 @@ async function handleSaveProfile(request: Request) {
       }
     }
 
-    // 2. Handle Resume upload or deletion on UploadThing
+    // 2. Validate & Upload or Delete Resume on UploadThing
     let resumeUrl = body.resumeUrl ?? existing.resume_url ?? '';
     let resumeName = body.resumeName ?? existing.resume_name ?? '';
     let resumeUpdatedAt =
@@ -279,30 +316,41 @@ async function handleSaveProfile(request: Request) {
       resumeUrl = '';
       resumeName = '';
       resumeUpdatedAt = '';
-    } else if (body.resumeBase64 && body.resumeFileName) {
-      try {
-        const matches = String(body.resumeBase64).match(
-          /^data:(.+);base64,(.+)$/
-        );
-        if (matches && matches.length === 3) {
-          const buffer = Buffer.from(matches[2], 'base64');
-          const fileObj = new File([buffer], body.resumeFileName, {
-            type: matches[1],
-          });
-          const uploadRes = await utapi.uploadFiles(fileObj);
-          const item = Array.isArray(uploadRes) ? uploadRes[0] : uploadRes;
-          if (item?.data) {
-            resumeUrl =
-              (item.data as any).ufsUrl || item.data.url || resumeUrl;
-            resumeName = body.resumeFileName;
-            resumeUpdatedAt = new Date().toISOString();
+    } else if (body.resumeBase64) {
+      const validation = validateAndDecodeBase64File(
+        body.resumeBase64,
+        body.resumeFileName || 'resume.pdf',
+        'resume'
+      );
 
-            const oldResumeKey = extractFileKey(existing.resume_url);
-            if (oldResumeKey) {
-              try {
-                await utapi.deleteFiles(oldResumeKey);
-              } catch {}
-            }
+      if (!validation.valid || !validation.buffer || !validation.safeFileName) {
+        return NextResponse.json(
+          { error: validation.error || 'Invalid resume file upload.' },
+          { status: 400 }
+        );
+      }
+
+      try {
+        const fileObj = new File(
+          [new Uint8Array(validation.buffer)],
+          validation.safeFileName,
+          { type: validation.mimeType }
+        );
+        const uploadRes = await utapi.uploadFiles(fileObj);
+        const item = Array.isArray(uploadRes) ? uploadRes[0] : uploadRes;
+        if (item?.data) {
+          resumeUrl = (item.data as any).ufsUrl || item.data.url || resumeUrl;
+          resumeName = safeString(
+            body.resumeFileName || validation.safeFileName,
+            200
+          );
+          resumeUpdatedAt = new Date().toISOString();
+
+          const oldResumeKey = extractFileKey(existing.resume_url);
+          if (oldResumeKey) {
+            try {
+              await utapi.deleteFiles(oldResumeKey);
+            } catch {}
           }
         }
       } catch (e) {
@@ -350,37 +398,59 @@ async function handleSaveProfile(request: Request) {
       diversity: body.diversity ?? existingProfileData.diversity ?? {},
     };
 
-    const resolvedName = body.name ?? existing.name ?? '';
-    const resolvedPhone = body.phone ?? existing.phone ?? '';
-    const resolvedLocation = body.location ?? existing.location ?? '';
-    const resolvedWorkStatus =
-      body.workStatus ?? existing.work_status ?? 'experienced';
-    const resolvedRole =
+    const resolvedName = safeString(body.name ?? existing.name ?? '', 255);
+    const resolvedPhone = safeString(body.phone ?? existing.phone ?? '', 50);
+    const resolvedLocation = safeString(
+      body.location ?? existing.location ?? '',
+      255
+    );
+    const resolvedWorkStatus = safeString(
+      body.workStatus ?? existing.work_status ?? 'experienced',
+      50
+    );
+    const resolvedRole = safeString(
       body.designation ??
-      (updatedProfileData.employmentList?.[0]?.designation ||
-        existing.role ||
-        '');
-    const resolvedCompany =
+        (updatedProfileData.employmentList?.[0]?.designation ||
+          existing.role ||
+          ''),
+      255
+    );
+    const resolvedCompany = safeString(
       body.company ??
-      (updatedProfileData.employmentList?.[0]?.company ||
-        existing.company ||
-        '');
-    const resolvedExperience = body.experience ?? existing.experience ?? '';
-    const resolvedSalary = body.salary ?? existing.salary ?? '';
-    const resolvedNoticePeriod =
-      body.noticePeriod ?? existing.notice_period ?? '';
-    const resolvedHeadline = body.headline ?? existing.headline ?? '';
-    const resolvedBio = body.bio ?? existing.bio ?? '';
+        (updatedProfileData.employmentList?.[0]?.company ||
+          existing.company ||
+          ''),
+      255
+    );
+    const resolvedExperience = safeString(
+      body.experience ?? existing.experience ?? '',
+      100
+    );
+    const resolvedSalary = safeString(
+      body.salary ?? existing.salary ?? '',
+      100
+    );
+    const resolvedNoticePeriod = safeString(
+      body.noticePeriod ?? existing.notice_period ?? '',
+      100
+    );
+    const resolvedHeadline = safeString(
+      body.headline ?? existing.headline ?? '',
+      1000
+    );
+    const resolvedBio = safeString(body.bio ?? existing.bio ?? '', 4000);
     const resolvedSkills = Array.isArray(body.skills)
-      ? body.skills.join(', ')
-      : existing.skills ?? '';
+      ? body.skills.map((s: unknown) => safeString(s, 100)).filter(Boolean).join(', ')
+      : safeString(existing.skills ?? '', 2000);
     const firstEdu = updatedProfileData.educationList?.[0];
-    const resolvedEducation = firstEdu
-      ? firstEdu.degree
-      : existing.education ?? '';
-    const resolvedCollege = firstEdu
-      ? firstEdu.institute
-      : existing.college ?? '';
+    const resolvedEducation = safeString(
+      firstEdu ? firstEdu.degree : existing.education ?? '',
+      255
+    );
+    const resolvedCollege = safeString(
+      firstEdu ? firstEdu.institute : existing.college ?? '',
+      255
+    );
 
     if (existingRows.length === 0) {
       await sql`

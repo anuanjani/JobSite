@@ -1,62 +1,84 @@
 import { NextResponse } from 'next/server';
-import { pool } from '../../../utils/db';
+import { sql, safeString } from '../../../utils/db';
 
-export async function POST(req: Request) {
+export async function POST(request: Request) {
   try {
-    const body = await req.json();
-    const { email, password } = body;
+    const body = await request.json();
+    const email = safeString(body?.email, 254).toLowerCase();
+    const password = safeString(body?.password, 256);
 
     if (!email || !password) {
-      return NextResponse.json({ error: "Email and password required" }, { status: 400 });
+      return NextResponse.json(
+        { error: 'Email and password are required.' },
+        { status: 400 }
+      );
     }
 
-    // 1. Clean the inputs to prevent trailing space or capitalization bugs
-    const cleanEmail = email.toLowerCase().trim();
-    const cleanPassword = password.trim();
+    const users = await sql`
+      SELECT id, email, password, role
+      FROM users
+      WHERE LOWER(TRIM(email)) = ${email}
+      LIMIT 1
+    `;
 
-    // 2. Fetch the user's core identity using case-insensitive lookup
-    const result = await pool.query(
-      'SELECT id, email, password_hash, role FROM users WHERE LOWER(email) = $1', 
-      [cleanEmail]
-    );
-    
-    // Safely check if the user exists
-    if (!result.rows || result.rows.length === 0) {
-      console.log(`Login failed: Email not found - ${cleanEmail}`);
-      return NextResponse.json({ error: "Incorrect email or password." }, { status: 401 });
+    if (users.length === 0 || users[0].password !== password) {
+      return NextResponse.json(
+        { error: 'Invalid email or password.' },
+        { status: 401 }
+      );
     }
 
-    const user = result.rows[0];
+    const user = users[0];
+    const role = String(user.role || 'CANDIDATE').toUpperCase();
+    let name = '';
+    let avatar = '';
+    let phone = '';
 
-    // 3. Verify password
-    if (user.password_hash !== cleanPassword && user.password_hash !== password) {
-      console.log(`Login failed: Password mismatch for - ${cleanEmail}`);
-      return NextResponse.json({ error: "Incorrect email or password." }, { status: 401 });
+    if (role === 'EMPLOYER') {
+      try {
+        const emp = await sql`
+          SELECT full_name, company_name, phone, avatar
+          FROM employer_profiles
+          WHERE user_id = ${user.id}
+          LIMIT 1
+        `;
+        if (emp.length > 0) {
+          name = emp[0].full_name || emp[0].company_name || '';
+          phone = emp[0].phone || '';
+          avatar = emp[0].avatar || '';
+        }
+      } catch {}
+    } else {
+      try {
+        const cand = await sql`
+          SELECT name, phone, avatar
+          FROM candidate_profiles
+          WHERE user_id = ${user.id}
+          LIMIT 1
+        `;
+        if (cand.length > 0) {
+          name = cand[0].name || '';
+          phone = cand[0].phone || '';
+          avatar = cand[0].avatar || '';
+        }
+      } catch {}
     }
 
-    // 4. Fetch their display name based on their role
-    let displayName = "User";
-    if (user.role === 'CANDIDATE') {
-       const profileRes = await pool.query('SELECT name FROM candidate_profiles WHERE user_id = $1', [user.id]);
-       if (profileRes.rows && profileRes.rows.length > 0) displayName = profileRes.rows[0].name;
-    } else if (user.role === 'EMPLOYER') {
-       const empRes = await pool.query('SELECT company_name FROM employer_profiles WHERE user_id = $1', [user.id]);
-       if (empRes.rows && empRes.rows.length > 0) displayName = empRes.rows[0].company_name;
-    }
-
-    // 5. Return success and the data your frontend localStorage needs
     return NextResponse.json({
-      success: true,
       user: {
         id: user.id,
         email: user.email,
-        role: user.role,
-        name: displayName
-      }
+        role,
+        name,
+        phone,
+        avatar,
+      },
     });
-
   } catch (error) {
-    console.error("Login error:", error);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    console.error('POST /api/login error:', error);
+    return NextResponse.json(
+      { error: 'Authentication failed.' },
+      { status: 500 }
+    );
   }
 }

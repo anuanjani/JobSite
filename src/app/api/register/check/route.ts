@@ -1,98 +1,74 @@
 import { NextResponse } from 'next/server';
-import { neon } from '@neondatabase/serverless';
+import { sql, safeString } from '../../../../utils/db';
 
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { email, mobile, phone } = body;
-    const rawPhone = mobile || phone || '';
+    const email = safeString(body?.email, 254).toLowerCase();
+    const rawMobile = safeString(body?.mobile, 20);
+    const mobile = rawMobile.replace(/\D/g, '');
 
-    const sql = neon(process.env.DATABASE_URL!);
-
-    // 1. Validate Email ID against `users` table (covers both candidates & employers)
     if (email) {
-      const cleanEmail = String(email).trim().toLowerCase();
-      const existingUser = await sql`
-        SELECT id FROM users
-        WHERE LOWER(TRIM(email)) = ${cleanEmail}
-        LIMIT 1
+      const existingEmail = await sql`
+        SELECT id FROM users WHERE LOWER(TRIM(email)) = ${email} LIMIT 1
       `;
-
-      if (existingUser.length > 0) {
+      if (existingEmail.length > 0) {
         return NextResponse.json(
           {
             exists: true,
-            field: 'email',
-            error: 'This Email ID is already registered. Please sign in or use a different email.',
+            error: 'This Email ID is already registered. Please sign in.',
           },
           { status: 409 }
         );
       }
     }
 
-    // 2. Validate Mobile Number against `candidate_profiles` and `employer_profiles`
-    if (rawPhone) {
-      const digitsOnly = String(rawPhone).replace(/\D/g, '');
-      const cleanPhone =
-        digitsOnly.length > 10 ? digitsOnly.slice(-10) : digitsOnly;
-
-      if (cleanPhone.length !== 10) {
+    if (mobile) {
+      if (mobile.length !== 10) {
         return NextResponse.json(
-          {
-            exists: false,
-            field: 'mobile',
-            error: 'Please enter a valid 10-digit mobile number.',
-          },
+          { exists: false, error: 'Invalid 10-digit mobile number.' },
           { status: 400 }
         );
       }
 
-      // Check candidate_profiles.phone
-      const existingCandidate = await sql`
-        SELECT id FROM candidate_profiles
-        WHERE REGEXP_REPLACE(COALESCE(phone, ''), '\\D', '', 'g') LIKE ${'%' + cleanPhone}
-        LIMIT 1
-      `;
+      let mobileExists = false;
 
-      if (existingCandidate.length > 0) {
+      try {
+        const candRows = await sql`
+          SELECT id FROM candidate_profiles
+          WHERE REGEXP_REPLACE(COALESCE(phone, ''), '[^0-9]', '', 'g') = ${mobile}
+          LIMIT 1
+        `;
+        if (candRows.length > 0) mobileExists = true;
+      } catch {}
+
+      if (!mobileExists) {
+        try {
+          const empRows = await sql`
+            SELECT id FROM employer_profiles
+            WHERE REGEXP_REPLACE(COALESCE(phone, ''), '[^0-9]', '', 'g') = ${mobile}
+            LIMIT 1
+          `;
+          if (empRows.length > 0) mobileExists = true;
+        } catch {}
+      }
+
+      if (mobileExists) {
         return NextResponse.json(
           {
             exists: true,
-            field: 'mobile',
-            error: 'This mobile number is already registered with a candidate account.',
+            error: 'This mobile number is already registered.',
           },
           { status: 409 }
         );
       }
-
-      // Check employer_profiles.phone
-      try {
-        const existingEmployer = await sql`
-          SELECT user_id FROM employer_profiles
-          WHERE REGEXP_REPLACE(COALESCE(phone, ''), '\\D', '', 'g') LIKE ${'%' + cleanPhone}
-          LIMIT 1
-        `;
-
-        if (existingEmployer.length > 0) {
-          return NextResponse.json(
-            {
-              exists: true,
-              field: 'mobile',
-              error: 'This mobile number is already registered with an employer account.',
-            },
-            { status: 409 }
-          );
-        }
-      } catch {
-        // Ignore if phone column is not yet initialized on employer_profiles
-      }
     }
 
-    return NextResponse.json({ exists: false, available: true });
-  } catch (error: any) {
+    return NextResponse.json({ exists: false });
+  } catch (error) {
     console.error('POST /api/register/check error:', error);
     return NextResponse.json(
-      { error: 'Failed to validate against database. Please try again.' },
+      { error: 'Validation check failed.' },
       { status: 500 }
     );
   }

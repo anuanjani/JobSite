@@ -1,7 +1,9 @@
 import { NextResponse } from 'next/server';
-import { neon } from '@neondatabase/serverless';
+import { sql, safeString, safePositiveInt } from '../../../utils/db';
 
-async function ensureJobsColumns(sql: any) {
+const ALLOWED_STATUSES = new Set(['ACTIVE', 'CLOSED', 'EXPIRED']);
+
+async function ensureJobsColumns() {
   await sql`
     CREATE TABLE IF NOT EXISTS jobs (
       id SERIAL PRIMARY KEY,
@@ -49,16 +51,19 @@ async function ensureJobsColumns(sql: any) {
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
-    const employerEmail = searchParams.get('employerEmail');
+    const employerEmail = safeString(searchParams.get('employerEmail'), 254);
     const onlyActive = searchParams.get('onlyActive') === 'true';
-    const jobId = searchParams.get('id');
+    const rawJobId = searchParams.get('id');
 
-    const sql = neon(process.env.DATABASE_URL!);
-    await ensureJobsColumns(sql);
+    await ensureJobsColumns();
 
-    if (jobId) {
+    if (rawJobId !== null) {
+      const validJobId = safePositiveInt(rawJobId);
+      if (!validJobId) {
+        return NextResponse.json({ error: 'Invalid Job ID' }, { status: 400 });
+      }
       const rows = await sql`
-        SELECT * FROM jobs WHERE id = ${Number(jobId)} LIMIT 1
+        SELECT * FROM jobs WHERE id = ${validJobId} LIMIT 1
       `;
       return NextResponse.json({ job: rows[0] || null });
     }
@@ -66,7 +71,7 @@ export async function GET(request: Request) {
     if (employerEmail) {
       const rows = await sql`
         SELECT * FROM jobs
-        WHERE LOWER(TRIM(COALESCE(employer_email, ''))) = LOWER(TRIM(${employerEmail}))
+        WHERE LOWER(TRIM(COALESCE(employer_email, ''))) = LOWER(${employerEmail})
         ORDER BY id DESC
       `;
       return NextResponse.json({ jobs: rows });
@@ -86,7 +91,7 @@ export async function GET(request: Request) {
     `;
 
     return NextResponse.json({ jobs: rows });
-  } catch (error: any) {
+  } catch (error) {
     console.error('GET /api/jobs error:', error);
     return NextResponse.json(
       { error: 'Failed to load jobs', jobs: [] },
@@ -98,20 +103,19 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const {
-      title,
-      workMode,
-      location,
-      salary,
-      experience,
-      openings,
-      postedDate,
-      noticePeriod,
-      skills,
-      description,
-      employerEmail,
-      companyName,
-    } = body;
+
+    const title = safeString(body?.title, 255);
+    const workMode = safeString(body?.workMode, 50) || 'Hybrid';
+    const location = safeString(body?.location, 255);
+    const salary = safeString(body?.salary, 100);
+    const experience = safeString(body?.experience, 100);
+    const openings = safePositiveInt(body?.openings) ?? 1;
+    const postedDate = safeString(body?.postedDate, 50);
+    const noticePeriod = safeString(body?.noticePeriod, 100);
+    const skills = safeString(body?.skills, 1000);
+    const description = safeString(body?.description, 10000);
+    const employerEmail = safeString(body?.employerEmail, 254).toLowerCase();
+    const companyName = safeString(body?.companyName, 255);
 
     if (!title || !experience || !noticePeriod || !description) {
       return NextResponse.json(
@@ -123,21 +127,23 @@ export async function POST(request: Request) {
       );
     }
 
-    const sql = neon(process.env.DATABASE_URL!);
-    await ensureJobsColumns(sql);
+    await ensureJobsColumns();
 
     let employerId: number | null = null;
     let resolvedCompany = companyName || 'Company';
 
     if (employerEmail) {
       const users = await sql`
-        SELECT id FROM users WHERE LOWER(TRIM(email)) = LOWER(TRIM(${employerEmail})) LIMIT 1
+        SELECT id FROM users WHERE LOWER(TRIM(email)) = ${employerEmail} LIMIT 1
       `;
       if (users.length > 0) {
         employerId = users[0].id;
         try {
           const emp = await sql`
-            SELECT company_name, full_name FROM employer_profiles WHERE user_id = ${employerId} LIMIT 1
+            SELECT company_name, full_name
+            FROM employer_profiles
+            WHERE user_id = ${employerId}
+            LIMIT 1
           `;
           if (emp.length > 0) {
             resolvedCompany =
@@ -165,17 +171,17 @@ export async function POST(request: Request) {
         status
       ) VALUES (
         ${employerId},
-        ${employerEmail || ''},
+        ${employerEmail},
         ${title},
         ${resolvedCompany},
-        ${location || ''},
-        ${workMode || 'Hybrid'},
-        ${salary || ''},
+        ${location},
+        ${workMode},
+        ${salary},
         ${experience},
-        ${Number(openings) || 1},
-        ${postedDate || ''},
+        ${openings},
+        ${postedDate},
         ${noticePeriod},
-        ${skills || ''},
+        ${skills},
         ${description},
         'ACTIVE'
       )
@@ -186,10 +192,10 @@ export async function POST(request: Request) {
       { success: true, job: inserted[0] },
       { status: 201 }
     );
-  } catch (error: any) {
+  } catch (error) {
     console.error('POST /api/jobs error:', error);
     return NextResponse.json(
-      { error: error?.message || 'Failed to create job posting' },
+      { error: 'Failed to create job posting' },
       { status: 500 }
     );
   }
@@ -198,26 +204,26 @@ export async function POST(request: Request) {
 export async function PATCH(request: Request) {
   try {
     const body = await request.json();
-    const { id, status } = body;
+    const jobId = safePositiveInt(body?.id);
+    const status = safeString(body?.status, 20).toUpperCase();
 
-    if (!id || !status) {
+    if (!jobId || !ALLOWED_STATUSES.has(status)) {
       return NextResponse.json(
-        { error: 'Job ID and status are required' },
+        { error: 'Valid Job ID and status (ACTIVE, CLOSED, EXPIRED) are required' },
         { status: 400 }
       );
     }
 
-    const sql = neon(process.env.DATABASE_URL!);
-    await ensureJobsColumns(sql);
+    await ensureJobsColumns();
 
     await sql`
       UPDATE jobs
-      SET status = ${String(status).toUpperCase()}
-      WHERE id = ${Number(id)}
+      SET status = ${status}
+      WHERE id = ${jobId}
     `;
 
     return NextResponse.json({ success: true });
-  } catch (error: any) {
+  } catch (error) {
     console.error('PATCH /api/jobs error:', error);
     return NextResponse.json(
       { error: 'Failed to update job status' },
@@ -229,24 +235,22 @@ export async function PATCH(request: Request) {
 export async function DELETE(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
-    let id = searchParams.get('id');
+    let rawId: unknown = searchParams.get('id');
 
-    if (!id) {
+    if (!rawId) {
       try {
         const body = await request.json();
-        if (body.id) id = String(body.id);
+        rawId = body?.id;
       } catch {}
     }
 
-    if (!id) {
+    const jobId = safePositiveInt(rawId);
+    if (!jobId) {
       return NextResponse.json(
-        { error: 'Job ID is required to delete job posting.' },
+        { error: 'Valid numeric Job ID is required to delete job posting.' },
         { status: 400 }
       );
     }
-
-    const jobId = Number(id);
-    const sql = neon(process.env.DATABASE_URL!);
 
     try {
       await sql`DELETE FROM job_applications WHERE job_id = ${jobId}`;
@@ -261,10 +265,10 @@ export async function DELETE(request: Request) {
       success: true,
       message: 'Job posting deleted successfully.',
     });
-  } catch (error: any) {
+  } catch (error) {
     console.error('DELETE /api/jobs error:', error);
     return NextResponse.json(
-      { error: error?.message || 'Failed to delete job posting' },
+      { error: 'Failed to delete job posting' },
       { status: 500 }
     );
   }

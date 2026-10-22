@@ -309,6 +309,41 @@ function formatLocalTimestamp(raw?: string): string {
   return `${year}-${month}-${day} ${hours}:${minutes}`;
 }
 
+// XSS Protection: Blocks javascript:, data:, and vbscript: URLs in <a href="...">
+function safeExternalHref(rawUrl?: string): string {
+  if (!rawUrl || typeof rawUrl !== 'string') return '#';
+  const trimmed = rawUrl.trim();
+  if (!trimmed || /^(javascript|vbscript|data|file|blob):/i.test(trimmed)) {
+    return '#';
+  }
+  const withProtocol = /^https?:\/\//i.test(trimmed)
+    ? trimmed
+    : `https://${trimmed}`;
+  try {
+    const parsed = new URL(withProtocol);
+    if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
+      return parsed.toString();
+    }
+  } catch {}
+  return '#';
+}
+
+// XSS Protection: Allows only http(s) URLs or safe raster image data URLs in <img src="...">
+function safeAvatarUrl(rawAvatar?: string): string {
+  if (!rawAvatar || typeof rawAvatar !== 'string') return '';
+  const trimmed = rawAvatar.trim();
+  if (/^data:image\/(png|jpeg|jpg|webp|gif);base64,[a-z0-9+/=]+$/i.test(trimmed)) {
+    return trimmed;
+  }
+  try {
+    const parsed = new URL(trimmed);
+    if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
+      return parsed.toString();
+    }
+  } catch {}
+  return '';
+}
+
 export default function CandidateProfilePage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -733,6 +768,18 @@ export default function CandidateProfilePage() {
   const handleAvatarUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || !e.target.files[0]) return;
     const file = e.target.files[0];
+    const allowedMimeTypes = [
+      'image/png',
+      'image/jpeg',
+      'image/jpg',
+      'image/webp',
+      'image/gif',
+    ];
+    if (!allowedMimeTypes.includes(file.type)) {
+      alert('Please upload a valid PNG, JPG, WEBP, or GIF image.');
+      return;
+    }
+
     const reader = new FileReader();
     reader.onload = () => {
       if (typeof reader.result === 'string') {
@@ -1062,30 +1109,36 @@ export default function CandidateProfilePage() {
     setAccompError('');
 
     const titleVal = accompDraft.title.trim();
-    const urlVal = accompDraft.url.trim();
+    const rawUrlVal = accompDraft.url.trim();
+    const validatedUrl = rawUrlVal ? safeExternalHref(rawUrlVal) : '';
+
+    if (rawUrlVal && validatedUrl === '#') {
+      setAccompError('Please enter a valid http:// or https:// URL.');
+      return;
+    }
 
     if (accompCategory === 'onlineProfiles') {
-      if (!titleVal || !urlVal) {
+      if (!titleVal || !validatedUrl) {
         setAccompError('Social profile and URL are mandatory.');
         return;
       }
     } else if (accompCategory === 'workSamples') {
-      if (!titleVal || !urlVal) {
+      if (!titleVal || !validatedUrl) {
         setAccompError('Work title and URL are mandatory.');
         return;
       }
     } else if (accompCategory === 'publications') {
-      if (!titleVal || !urlVal) {
+      if (!titleVal || !validatedUrl) {
         setAccompError('Title and URL are mandatory.');
         return;
       }
     } else if (accompCategory === 'presentations') {
-      if (!titleVal || !urlVal) {
+      if (!titleVal || !validatedUrl) {
         setAccompError('Presentation title and URL are mandatory.');
         return;
       }
     } else if (accompCategory === 'patents') {
-      if (!titleVal || !urlVal) {
+      if (!titleVal || !validatedUrl) {
         setAccompError('Patent title and URL are mandatory.');
         return;
       }
@@ -1162,7 +1215,7 @@ export default function CandidateProfilePage() {
       ...accompDraft,
       id: accompDraft.id || String(Date.now()),
       title: titleVal,
-      url: urlVal,
+      url: validatedUrl === '#' ? '' : validatedUrl,
       subtitle: computedSubtitle,
       validity: computedValidity,
     };
@@ -1193,12 +1246,18 @@ export default function CandidateProfilePage() {
     const jobTypes = Array.isArray(cp.desiredJobTypes)
       ? cp.desiredJobTypes
       : cp.desiredJobType
-      ? cp.desiredJobType.split(',').map((s) => s.trim()).filter(Boolean)
+      ? cp.desiredJobType
+          .split(',')
+          .map((s) => s.trim())
+          .filter(Boolean)
       : ['Permanent'];
     const empTypes = Array.isArray(cp.desiredEmploymentTypes)
       ? cp.desiredEmploymentTypes
       : cp.desiredEmploymentType
-      ? cp.desiredEmploymentType.split(',').map((s) => s.trim()).filter(Boolean)
+      ? cp.desiredEmploymentType
+          .split(',')
+          .map((s) => s.trim())
+          .filter(Boolean)
       : ['Full time'];
 
     const rawSalary = String(cp.preferredSalary || '0').replace(/^[₹$]\s*/, '');
@@ -1246,7 +1305,8 @@ export default function CandidateProfilePage() {
 
     const updatedCareer: CareerProfileData = {
       ...careerDraft,
-      desiredJobType: (careerDraft.desiredJobTypes || []).join(', ') || 'Permanent',
+      desiredJobType:
+        (careerDraft.desiredJobTypes || []).join(', ') || 'Permanent',
       desiredEmploymentType:
         (careerDraft.desiredEmploymentTypes || []).join(', ') || 'Full time',
       preferredSalary: formattedSalary,
@@ -1278,7 +1338,10 @@ export default function CandidateProfilePage() {
     const countries = Array.isArray(pd.workPermitCountries)
       ? pd.workPermitCountries
       : pd.workPermit
-      ? pd.workPermit.split(',').map((s) => s.trim()).filter(Boolean)
+      ? pd.workPermit
+          .split(',')
+          .map((s) => s.trim())
+          .filter(Boolean)
       : ['India'];
 
     setPersonalDraft({
@@ -1522,9 +1585,9 @@ export default function CandidateProfilePage() {
                 className="w-23 h-23 rounded-full overflow-hidden bg-slate-800 flex items-center justify-center cursor-pointer relative"
                 title="Click to update profile photo"
               >
-                {profile.avatar ? (
+                {safeAvatarUrl(profile.avatar) ? (
                   <img
-                    src={profile.avatar}
+                    src={safeAvatarUrl(profile.avatar)}
                     alt={profile.name}
                     className="w-full h-full object-cover"
                   />
@@ -1538,7 +1601,7 @@ export default function CandidateProfilePage() {
                 </div>
                 <input
                   type="file"
-                  accept="image/*"
+                  accept="image/png,image/jpeg,image/webp,image/gif"
                   onChange={handleAvatarUpload}
                   className="hidden"
                 />
@@ -1731,17 +1794,18 @@ export default function CandidateProfilePage() {
                     </p>
                   </div>
                   <div className="flex items-center gap-2.5">
-                    {profile.resumeUrl && (
-                      <a
-                        href={profile.resumeUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="w-9 h-9 rounded-full bg-slate-800 hover:bg-slate-700 border border-slate-700 flex items-center justify-center text-blue-400 transition"
-                        title="Download Resume"
-                      >
-                        ↓
-                      </a>
-                    )}
+                    {profile.resumeUrl &&
+                      safeExternalHref(profile.resumeUrl) !== '#' && (
+                        <a
+                          href={safeExternalHref(profile.resumeUrl)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="w-9 h-9 rounded-full bg-slate-800 hover:bg-slate-700 border border-slate-700 flex items-center justify-center text-blue-400 transition"
+                          title="Download Resume"
+                        >
+                          ↓
+                        </a>
+                      )}
                     <button
                       type="button"
                       onClick={handleDeleteResume}
@@ -2361,16 +2425,17 @@ export default function CandidateProfilePage() {
                                     Delete
                                   </button>
                                 </div>
-                                {entry.url && (
-                                  <a
-                                    href={entry.url}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="text-xs text-blue-400 hover:underline block truncate mt-0.5"
-                                  >
-                                    {entry.url}
-                                  </a>
-                                )}
+                                {entry.url &&
+                                  safeExternalHref(entry.url) !== '#' && (
+                                    <a
+                                      href={safeExternalHref(entry.url)}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="text-xs text-blue-400 hover:underline block truncate mt-0.5"
+                                    >
+                                      {entry.url}
+                                    </a>
+                                  )}
                                 {entry.validity && (
                                   <p className="text-[11px] text-slate-400 mt-0.5">
                                     {entry.validity}
@@ -4619,9 +4684,7 @@ export default function CandidateProfilePage() {
               </form>
             )}
 
-            {/* ================================================================
-                MODAL 10: CAREER PROFILE FORM (Matches Screenshots 2.57.57 & 2.58.02 PM)
-               ================================================================ */}
+            {/* MODAL 10: CAREER PROFILE FORM */}
             {activeModal === 'career' && (
               <form noValidate onSubmit={handleSaveCareerProfile}>
                 <div className="pb-5 mb-7 border-b border-slate-800 pr-12">
@@ -4635,7 +4698,6 @@ export default function CandidateProfilePage() {
                 </div>
 
                 <div className="space-y-6">
-                  {/* 1. Current industry * */}
                   <div>
                     <label className={LABEL_CLASS}>
                       Current industry <span className="text-red-500">*</span>
@@ -4659,7 +4721,6 @@ export default function CandidateProfilePage() {
                     </select>
                   </div>
 
-                  {/* 2. Department * */}
                   <div>
                     <label className={LABEL_CLASS}>
                       Department <span className="text-red-500">*</span>
@@ -4683,7 +4744,6 @@ export default function CandidateProfilePage() {
                     </select>
                   </div>
 
-                  {/* 3. Role category * */}
                   <div>
                     <label className={LABEL_CLASS}>
                       Role category <span className="text-red-500">*</span>
@@ -4707,7 +4767,6 @@ export default function CandidateProfilePage() {
                     </select>
                   </div>
 
-                  {/* 4. Job role * */}
                   <div>
                     <label className={LABEL_CLASS}>
                       Job role <span className="text-red-500">*</span>
@@ -4731,7 +4790,6 @@ export default function CandidateProfilePage() {
                     </select>
                   </div>
 
-                  {/* 5. Desired job type (Checkboxes: Permanent, Contractual) */}
                   <div>
                     <label className={LABEL_CLASS}>Desired job type</label>
                     <div className="flex items-center gap-12 pt-1 text-xs font-semibold text-slate-200">
@@ -4767,7 +4825,6 @@ export default function CandidateProfilePage() {
                     </div>
                   </div>
 
-                  {/* 6. Desired employment type (Checkboxes: Full time, Part time) */}
                   <div>
                     <label className={LABEL_CLASS}>
                       Desired employment type
@@ -4805,7 +4862,6 @@ export default function CandidateProfilePage() {
                     </div>
                   </div>
 
-                  {/* 7. Preferred job role (Max 3) */}
                   <div>
                     <label className={LABEL_CLASS}>
                       Preferred job role (Max 3)
@@ -4824,7 +4880,6 @@ export default function CandidateProfilePage() {
                     />
                   </div>
 
-                  {/* 8. Preferred work location (Max 10) */}
                   <div>
                     <label className={LABEL_CLASS}>
                       Preferred work location (Max 10)
@@ -4843,7 +4898,6 @@ export default function CandidateProfilePage() {
                     />
                   </div>
 
-                  {/* 9. Preferred annual salary */}
                   <div>
                     <label className={LABEL_CLASS}>
                       Preferred annual salary
@@ -4878,7 +4932,6 @@ export default function CandidateProfilePage() {
                     </div>
                   </div>
 
-                  {/* 10. Preferred shift (Pill buttons: Day, Night, Flexible) */}
                   <div>
                     <label className={LABEL_CLASS}>Preferred shift</label>
                     <div className="flex flex-wrap gap-3 pt-1">
@@ -4913,10 +4966,7 @@ export default function CandidateProfilePage() {
               </form>
             )}
 
-            {/* ================================================================
-                MODAL 11: PERSONAL DETAILS & LANGUAGE PROFICIENCY FORM
-                (Matches Screenshots 2.59.29 & 2.59.35 PM)
-               ================================================================ */}
+            {/* MODAL 11: PERSONAL DETAILS & LANGUAGE PROFICIENCY FORM */}
             {activeModal === 'personal' && (
               <form noValidate onSubmit={handleSavePersonalDetails}>
                 <div className="pb-5 mb-7 border-b border-slate-800 pr-12">
@@ -4930,7 +4980,6 @@ export default function CandidateProfilePage() {
                 </div>
 
                 <div className="space-y-6">
-                  {/* 1. Gender (Pills: Male, Female, Transgender) */}
                   <div>
                     <label className={LABEL_CLASS}>Gender</label>
                     <div className="flex flex-wrap gap-3 pt-1">
@@ -4952,7 +5001,6 @@ export default function CandidateProfilePage() {
                     </div>
                   </div>
 
-                  {/* 2. More information */}
                   <div>
                     <label className="block text-xs font-bold text-slate-200 mb-1">
                       More information
@@ -4996,7 +5044,6 @@ export default function CandidateProfilePage() {
                     </div>
                   </div>
 
-                  {/* 3. Marital status */}
                   <div>
                     <label className={LABEL_CLASS}>Marital status</label>
                     <div className="flex flex-wrap gap-2.5 pt-1">
@@ -5031,7 +5078,6 @@ export default function CandidateProfilePage() {
                     </div>
                   </div>
 
-                  {/* 4. Date of birth (DD / MM / YYYY) */}
                   <div>
                     <label className={LABEL_CLASS}>Date of birth</label>
                     <div className="grid grid-cols-3 gap-4">
@@ -5091,7 +5137,6 @@ export default function CandidateProfilePage() {
                     </div>
                   </div>
 
-                  {/* 5. Category */}
                   <div>
                     <label className="block text-xs font-bold text-slate-200 mb-1">
                       Category
@@ -5130,7 +5175,6 @@ export default function CandidateProfilePage() {
                     </div>
                   </div>
 
-                  {/* 6. Work permit for USA */}
                   <div>
                     <label className={LABEL_CLASS}>Work permit for USA</label>
                     <div className="flex flex-wrap gap-2.5 pt-1">
@@ -5166,7 +5210,6 @@ export default function CandidateProfilePage() {
                     </div>
                   </div>
 
-                  {/* 7. Work permit for other countries (Max 3) */}
                   <div>
                     <label className={LABEL_CLASS}>
                       Work permit for other countries
@@ -5229,7 +5272,6 @@ export default function CandidateProfilePage() {
                     )}
                   </div>
 
-                  {/* 8. Permanent address */}
                   <div>
                     <label className={LABEL_CLASS}>Permanent address</label>
                     <input
@@ -5246,7 +5288,6 @@ export default function CandidateProfilePage() {
                     />
                   </div>
 
-                  {/* 9. Hometown */}
                   <div>
                     <label className={LABEL_CLASS}>Hometown</label>
                     <input
@@ -5263,7 +5304,6 @@ export default function CandidateProfilePage() {
                     />
                   </div>
 
-                  {/* 10. Pincode */}
                   <div>
                     <label className={LABEL_CLASS}>Pincode</label>
                     <input
@@ -5281,7 +5321,6 @@ export default function CandidateProfilePage() {
                     />
                   </div>
 
-                  {/* 11. Language proficiency section */}
                   <div className="pt-4 border-t border-slate-800">
                     <h4 className="text-base font-extrabold text-white">
                       Language proficiency
@@ -5459,9 +5498,7 @@ export default function CandidateProfilePage() {
               </form>
             )}
 
-            {/* ================================================================
-                MODAL 12: DIVERSITY & INCLUSION FORM (Matches Screenshot 2.59.57 PM)
-               ================================================================ */}
+            {/* MODAL 12: DIVERSITY & INCLUSION FORM */}
             {activeModal === 'diversity' && (
               <form
                 onSubmit={(e) => {
@@ -5484,7 +5521,6 @@ export default function CandidateProfilePage() {
                 </div>
 
                 <div className="space-y-6">
-                  {/* 1. Disability status */}
                   <div>
                     <label className="block text-xs font-bold text-slate-200 mb-1">
                       Disability status
@@ -5515,7 +5551,6 @@ export default function CandidateProfilePage() {
                     </div>
                   </div>
 
-                  {/* 2. Military experience */}
                   <div>
                     <label className={LABEL_CLASS}>Military experience</label>
                     <div className="flex flex-wrap gap-3 pt-1">
@@ -5545,7 +5580,6 @@ export default function CandidateProfilePage() {
                     </div>
                   </div>
 
-                  {/* 3. Career break */}
                   <div>
                     <label className="block text-xs font-bold text-slate-200 mb-1">
                       Career break
