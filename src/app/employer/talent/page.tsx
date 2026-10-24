@@ -1,167 +1,273 @@
 'use client';
 import React, { useState, useEffect } from 'react';
-import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 
 interface CandidateProfile {
-  id: number | string;
-  userId?: number | string;
+  id: number;
+  userId?: number;
   name: string;
   email: string;
   phone: string;
   location: string;
-  workStatus: 'fresher' | 'experienced';
-  workStatusLabel: 'Fresher' | 'Experienced';
+  workStatus: string;
+  openToWork: boolean;
   role: string;
+  designation: string;
   company: string;
   experience: string;
   experienceYears: number;
-  education: string;
-  college: string;
   salary: string;
   noticePeriod: string;
+  headline: string;
   bio: string;
+  skills: string[];
+  education: string;
+  college: string;
   avatar: string;
   resumeUrl: string;
-  linkedin: string;
-  github: string;
-  portfolio: string;
-  skills: string[];
-  openToWork: boolean;
+  resumeName: string;
+  updatedAt: string;
+  employmentList?: any[];
+  educationList?: any[];
+  itSkills?: any[];
+  projects?: any[];
+  languages?: any[];
 }
 
-export default function EmployerTalentPage() {
+function safeText(val: unknown, fallback = ''): string {
+  if (val === null || val === undefined) return fallback;
+  if (typeof val === 'string') return val.trim() || fallback;
+  if (typeof val === 'number' || typeof val === 'boolean') return String(val);
+  return fallback;
+}
+
+/**
+ * Masks an email address as: an***j***@live.in
+ */
+function maskEmail(rawEmail: unknown): string {
+  const email = safeText(rawEmail);
+  if (!email || !email.includes('@')) return 'Not provided';
+
+  const [localPart, domain] = email.split('@');
+  if (!localPart || !domain) return 'Not provided';
+
+  if (localPart.length >= 6) {
+    const firstTwo = localPart.slice(0, 2);
+    const midChar = localPart[Math.ceil(localPart.length / 2)];
+    return `${firstTwo}***${midChar}***@${domain}`;
+  }
+
+  if (localPart.length > 2) {
+    return `${localPart.slice(0, 2)}***@${domain}`;
+  }
+
+  return `${localPart.charAt(0)}***@${domain}`;
+}
+
+/**
+ * Masks a phone number as: +91-******1873
+ */
+function maskPhone(rawPhone: unknown): string {
+  const phone = safeText(rawPhone);
+  const digits = phone.replace(/\D/g, '');
+  if (digits.length < 4) return '+91-**********';
+
+  const lastFour = digits.slice(-4);
+  return `+91-******${lastFour}`;
+}
+
+export default function EmployerTalentSearchPage() {
+  const router = useRouter();
   const [candidates, setCandidates] = useState<CandidateProfile[]>([]);
   const [loading, setLoading] = useState(true);
-
-  // Selected candidate for "View Profile" modal
-  const [selectedCandidate, setSelectedCandidate] =
-    useState<CandidateProfile | null>(null);
+  const [sendingMsg, setSendingMsg] = useState(false);
 
   // Search & Filter states
-  const [searchInput, setSearchInput] = useState('');
-  const [appliedSearch, setAppliedSearch] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
   const [onlyOpenToWork, setOnlyOpenToWork] = useState(true);
-  const [workStatusFilter, setWorkStatusFilter] = useState<
+  const [statusFilter, setStatusFilter] = useState<
     'all' | 'experienced' | 'fresher'
   >('all');
   const [maxExperience, setMaxExperience] = useState<number>(20);
 
+  // Active Modals
+  const [selectedCandidate, setSelectedCandidate] =
+    useState<CandidateProfile | null>(null);
+  const [messageTarget, setMessageTarget] = useState<CandidateProfile | null>(
+    null
+  );
+  const [messageText, setMessageText] = useState('');
+  const [toast, setToast] = useState('');
+
+  const fetchCandidates = async (query = '') => {
+    setLoading(true);
+    try {
+      const url = query
+        ? `/api/employer/talent?q=${encodeURIComponent(query)}`
+        : '/api/employer/talent';
+      const res = await fetch(url, { cache: 'no-store' });
+      const data = await res.json();
+      if (data && Array.isArray(data.candidates)) {
+        setCandidates(data.candidates);
+      } else {
+        setCandidates([]);
+      }
+    } catch (err) {
+      console.error('Failed to fetch candidates:', err);
+      setCandidates([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    fetch('/api/employer/talent')
-      .then((res) => res.json())
-      .then((data) => {
-        if (data?.candidates && Array.isArray(data.candidates)) {
-          setCandidates(data.candidates);
-        }
-      })
-      .catch((err) => {
-        console.error('Failed to load candidates:', err);
-      })
-      .finally(() => setLoading(false));
+    fetchCandidates();
   }, []);
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    setAppliedSearch(searchInput.trim());
+    fetchCandidates(searchQuery);
   };
 
-  const filteredCandidates = candidates.filter((c) => {
-    if (onlyOpenToWork && !c.openToWork) {
-      return false;
+  const handleRedirectToBuyPlan = () => {
+    router.push('/employer/dashboard');
+  };
+
+  const filteredCandidates = candidates.filter((cand) => {
+    if (onlyOpenToWork && !cand.openToWork) return false;
+    if (statusFilter !== 'all') {
+      const candStatus = safeText(cand.workStatus, 'experienced').toLowerCase();
+      if (candStatus !== statusFilter) return false;
+    }
+    const yrs =
+      typeof cand.experienceYears === 'number' ? cand.experienceYears : 0;
+    if (yrs > maxExperience) return false;
+
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      const matchName = safeText(cand.name).toLowerCase().includes(q);
+      const matchRole = safeText(cand.role).toLowerCase().includes(q);
+      const matchLoc = safeText(cand.location).toLowerCase().includes(q);
+      const matchSkills = Array.isArray(cand.skills)
+        ? cand.skills.some((s) => safeText(s).toLowerCase().includes(q))
+        : false;
+      return matchName || matchRole || matchLoc || matchSkills;
     }
 
-    if (workStatusFilter !== 'all' && c.workStatus !== workStatusFilter) {
-      return false;
-    }
-
-    if (c.experienceYears > maxExperience) {
-      return false;
-    }
-
-    const query = (appliedSearch || searchInput).trim().toLowerCase();
-    if (!query) return true;
-
-    const matchesName = c.name?.toLowerCase().includes(query);
-    const matchesRole = c.role?.toLowerCase().includes(query);
-    const matchesLocation = c.location?.toLowerCase().includes(query);
-    const matchesWorkStatus = c.workStatusLabel?.toLowerCase().includes(query);
-    const matchesSkills = c.skills?.some((skill) =>
-      skill.toLowerCase().includes(query)
-    );
-
-    return (
-      matchesName ||
-      matchesRole ||
-      matchesLocation ||
-      matchesWorkStatus ||
-      matchesSkills
-    );
+    return true;
   });
 
-  return (
-    <div className="min-h-screen bg-slate-900 text-slate-100 font-sans py-10 px-6 md:px-12 relative overflow-hidden">
-      {/* Subtle Ambient Background Glow */}
-      <div className="absolute bottom-[5%] left-[5%] w-[500px] h-[500px] bg-teal-500/10 blur-[150px] rounded-full pointer-events-none"></div>
+  const handleSendMessage = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!messageTarget || !messageText.trim()) return;
 
-      <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-8 items-start relative z-10">
-        {/* ==========================================================
-            LEFT SIDEBAR: CANDIDATE FILTERS
-           ========================================================== */}
-        <aside className="lg:col-span-3 bg-slate-800/40 backdrop-blur-xl border border-slate-700/60 rounded-3xl p-7 shadow-xl">
-          <h2 className="text-lg font-extrabold text-white mb-6">
+    setSendingMsg(true);
+    try {
+      let senderEmail = '';
+      let senderName = 'Recruiter';
+      let senderCompany = '';
+
+      const savedUser = localStorage.getItem('user');
+      if (savedUser) {
+        try {
+          const parsed = JSON.parse(savedUser);
+          senderEmail = parsed.email || '';
+          senderName = parsed.name || parsed.companyName || 'Recruiter';
+          senderCompany = parsed.companyName || parsed.company || '';
+        } catch {}
+      }
+
+      const res = await fetch('/api/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          senderEmail,
+          senderName,
+          senderCompany,
+          receiverEmail: messageTarget.email,
+          subject: `Job Opportunity from ${senderCompany || senderName}`,
+          message: messageText.trim(),
+        }),
+      });
+
+      if (res.ok) {
+        setToast(`Message sent to ${safeText(messageTarget.name)}!`);
+        setMessageText('');
+        setMessageTarget(null);
+        setTimeout(() => setToast(''), 3000);
+      } else {
+        const errData = await res.json();
+        alert(errData.error || 'Failed to send message.');
+      }
+    } catch (err) {
+      console.error('Error sending message:', err);
+    } finally {
+      setSendingMsg(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-slate-950 text-slate-100 font-sans py-10 px-4 sm:px-8">
+      {toast && (
+        <div className="fixed bottom-6 right-6 z-[999999] bg-emerald-600 text-white px-5 py-3 rounded-2xl shadow-2xl text-xs font-extrabold flex items-center gap-2">
+          <span>✓</span>
+          <span>{toast}</span>
+        </div>
+      )}
+
+      <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+        {/* LEFT SIDEBAR: CANDIDATE FILTERS */}
+        <aside className="lg:col-span-3 bg-slate-900/90 border border-slate-800 rounded-3xl p-6 shadow-xl lg:sticky lg:top-24">
+          <h2 className="text-base font-extrabold text-white mb-6">
             Candidate Filters
           </h2>
 
-          {/* Availability Filter */}
-          <div className="mb-7">
-            <label className="block text-[10px] font-extrabold uppercase tracking-widest text-slate-400 mb-3">
+          {/* Availability */}
+          <div className="mb-6">
+            <span className="block text-[10px] font-extrabold uppercase tracking-wider text-slate-400 mb-3">
               Availability
-            </label>
-            <label className="flex items-center gap-3 cursor-pointer text-sm font-medium text-slate-200">
+            </span>
+            <label className="flex items-center gap-2.5 text-xs font-semibold text-slate-200 cursor-pointer">
               <input
                 type="checkbox"
                 checked={onlyOpenToWork}
                 onChange={(e) => setOnlyOpenToWork(e.target.checked)}
-                className="w-4 h-4 rounded border-slate-600 bg-slate-900 text-indigo-600 focus:ring-0 cursor-pointer"
+                className="w-4 h-4 rounded accent-blue-600 cursor-pointer"
               />
               <span>Open to Work</span>
             </label>
           </div>
 
-          {/* Work Status Filter (Fresher / Experienced) */}
-          <div className="mb-7">
-            <label className="block text-[10px] font-extrabold uppercase tracking-widest text-slate-400 mb-3">
+          {/* Work Status */}
+          <div className="mb-6">
+            <span className="block text-[10px] font-extrabold uppercase tracking-wider text-slate-400 mb-3">
               Work Status
-            </label>
-            <div className="grid grid-cols-3 gap-1.5 bg-slate-900/80 p-1 rounded-xl border border-slate-700/70">
-              {[
-                { id: 'all', label: 'All' },
-                { id: 'experienced', label: 'Experienced' },
-                { id: 'fresher', label: 'Fresher' },
-              ].map((tab) => (
+            </span>
+            <div className="grid grid-cols-3 gap-1.5 bg-slate-950 p-1.5 rounded-2xl border border-slate-800 text-xs font-bold">
+              {(['all', 'experienced', 'fresher'] as const).map((st) => (
                 <button
-                  key={tab.id}
+                  key={st}
                   type="button"
-                  onClick={() => setWorkStatusFilter(tab.id as any)}
-                  className={`py-1.5 px-2 rounded-lg text-[11px] font-bold transition cursor-pointer ${
-                    workStatusFilter === tab.id
+                  onClick={() => setStatusFilter(st)}
+                  className={`py-2 rounded-xl capitalize transition cursor-pointer ${
+                    statusFilter === st
                       ? 'bg-indigo-600 text-white shadow'
                       : 'text-slate-400 hover:text-white'
                   }`}
                 >
-                  {tab.label}
+                  {st}
                 </button>
               ))}
             </div>
           </div>
 
-          {/* Experience Slider */}
+          {/* Experience Range */}
           <div>
-            <div className="flex items-center justify-between mb-3">
-              <label className="text-[10px] font-extrabold uppercase tracking-widest text-slate-400">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">
                 Experience
-              </label>
-              <span className="text-xs font-bold text-indigo-400">
+              </span>
+              <span className="text-xs font-extrabold text-blue-400">
                 Up to {maxExperience} yrs
               </span>
             </div>
@@ -176,369 +282,471 @@ export default function EmployerTalentPage() {
           </div>
         </aside>
 
-        {/* ==========================================================
-            RIGHT MAIN CONTENT: SEARCH BAR & LIVE CANDIDATE CARDS
-           ========================================================== */}
-        <div className="lg:col-span-9 space-y-6">
-          {/* Top Search Bar */}
+        {/* RIGHT CONTENT: SEARCH BAR & CANDIDATE CARDS */}
+        <main className="lg:col-span-9 space-y-6">
           <form
             onSubmit={handleSearchSubmit}
-            className="w-full bg-slate-800/50 backdrop-blur-xl border border-slate-700/70 rounded-full p-2 pl-6 flex items-center justify-between gap-4 shadow-xl"
+            className="bg-slate-900/90 border border-slate-800 rounded-full p-2 pl-6 flex items-center gap-3 shadow-xl"
           >
-            <div className="flex items-center gap-3 flex-1">
-              <span className="text-slate-400 text-sm">🔍</span>
-              <input
-                type="text"
-                placeholder="Search talents by skill, title, or keyword..."
-                value={searchInput}
-                onChange={(e) => {
-                  setSearchInput(e.target.value);
-                  if (e.target.value === '') setAppliedSearch('');
-                }}
-                className="w-full bg-transparent text-sm text-white placeholder:text-slate-400 outline-none"
-              />
-            </div>
+            <span className="text-slate-400 text-sm">🔍</span>
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search talents by skill, title, or keyword..."
+              className="flex-1 bg-transparent text-sm text-white placeholder:text-slate-500 outline-none"
+            />
             <button
               type="submit"
-              className="px-7 py-3 rounded-full bg-indigo-600 hover:bg-indigo-500 text-white font-extrabold text-xs uppercase tracking-widest transition cursor-pointer shadow-md shrink-0"
+              className="px-7 py-3 rounded-full bg-indigo-600 hover:bg-indigo-500 text-xs font-extrabold uppercase tracking-wider text-white transition cursor-pointer"
             >
               Search
             </button>
           </form>
 
-          {/* Candidate Cards Grid */}
           {loading ? (
-            <div className="p-12 rounded-3xl bg-slate-800/30 border border-slate-800 text-center text-sm text-slate-400">
-              Loading candidate profiles from database...
+            <div className="bg-slate-900/60 border border-slate-800 rounded-3xl p-12 text-center text-sm text-slate-400">
+              Loading candidate profiles...
             </div>
-          ) : filteredCandidates.length > 0 ? (
+          ) : filteredCandidates.length === 0 ? (
+            <div className="bg-slate-900/60 border border-slate-800 rounded-3xl p-12 text-center">
+              <h3 className="text-base font-extrabold text-white">
+                No candidate profiles found
+              </h3>
+              <p className="text-xs text-slate-400 mt-1">
+                Try clearing your search keyword or adjusting the filters.
+              </p>
+            </div>
+          ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {filteredCandidates.map((candidate) => (
+              {filteredCandidates.map((cand) => (
                 <div
-                  key={candidate.id}
-                  className="p-7 rounded-3xl bg-slate-800/40 backdrop-blur-xl border border-slate-700/60 hover:border-slate-600 transition-all flex flex-col justify-between shadow-xl"
+                  key={cand.id}
+                  className="bg-slate-900 border border-slate-800 hover:border-slate-700 rounded-3xl p-6 shadow-xl flex flex-col justify-between transition"
                 >
                   <div>
-                    {/* Candidate Header: Avatar + Name + Work Status Badge */}
-                    <div className="flex items-start justify-between gap-3 mb-5">
-                      <div className="flex items-center gap-4 min-w-0">
-                        <div className="w-12 h-12 rounded-full bg-slate-900 border border-slate-700 flex items-center justify-center font-extrabold text-base text-white shrink-0 overflow-hidden">
-                          {candidate.avatar ? (
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex items-center gap-3.5">
+                        <div className="w-12 h-12 rounded-full overflow-hidden bg-slate-800 border border-slate-700 flex items-center justify-center shrink-0">
+                          {cand.avatar ? (
                             <img
-                              src={candidate.avatar}
-                              alt={candidate.name}
+                              src={cand.avatar}
+                              alt={safeText(cand.name)}
                               className="w-full h-full object-cover"
                             />
                           ) : (
-                            candidate.name.charAt(0).toUpperCase()
+                            <span className="text-base font-extrabold text-white">
+                              {safeText(cand.name, 'U').charAt(0).toUpperCase()}
+                            </span>
                           )}
                         </div>
-                        <div className="min-w-0">
-                          <h3 className="text-lg font-extrabold text-white truncate">
-                            {candidate.name}
+                        <div>
+                          <h3 className="text-base font-extrabold text-white">
+                            {safeText(cand.name, 'Candidate')}
                           </h3>
-                          <p className="text-xs font-medium text-slate-400 truncate mt-0.5">
-                            {candidate.role} • {candidate.location}
+                          <p className="text-xs text-slate-400 mt-0.5">
+                            {safeText(cand.role, 'Software Professional')} •{' '}
+                            {safeText(cand.location, 'India')}
                           </p>
                         </div>
                       </div>
 
-                      {/* Fresher / Experienced Badge */}
-                      <span
-                        className={`shrink-0 px-3 py-1 rounded-full text-[10px] font-extrabold uppercase tracking-wider border ${
-                          candidate.workStatus === 'fresher'
-                            ? 'bg-amber-500/15 text-amber-300 border-amber-500/30'
-                            : 'bg-indigo-500/15 text-indigo-300 border-indigo-500/30'
-                        }`}
-                      >
-                        {candidate.workStatus === 'fresher'
-                          ? '🎓 Fresher'
-                          : '💼 Experienced'}
+                      <span className="px-3 py-1 rounded-full bg-indigo-500/15 border border-indigo-500/30 text-[10px] font-extrabold uppercase tracking-wider text-indigo-300 shrink-0">
+                        💼 {safeText(cand.workStatus, 'EXPERIENCED')}
                       </span>
                     </div>
 
-                    {/* Skills Pills */}
-                    <div className="flex flex-wrap gap-2 mb-6">
-                      {candidate.skills && candidate.skills.length > 0 ? (
-                        candidate.skills.map((skill, idx) => (
+                    {Array.isArray(cand.skills) && cand.skills.length > 0 && (
+                      <div className="flex flex-wrap gap-2 mt-5">
+                        {cand.skills.slice(0, 6).map((skill, idx) => (
                           <span
                             key={idx}
-                            className="px-3.5 py-1 rounded-full bg-slate-900 border border-slate-700/80 text-[10px] font-extrabold uppercase tracking-wider text-slate-300"
+                            className="px-3 py-1 rounded-full bg-slate-950 border border-slate-800 text-[10px] font-extrabold uppercase tracking-wider text-slate-300"
                           >
-                            {skill}
+                            {safeText(skill)}
                           </span>
-                        ))
-                      ) : (
-                        <span className="px-3.5 py-1 rounded-full bg-slate-900 border border-slate-700/80 text-[10px] font-extrabold uppercase tracking-wider text-slate-400">
-                          Verified Profile
-                        </span>
-                      )}
-                    </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
 
-                  {/* Card Footer: Availability + View Profile & Message Buttons */}
-                  <div className="pt-4 border-t border-slate-700/50 flex items-center justify-between gap-3">
-                    <span className="text-[10px] font-extrabold uppercase tracking-widest text-emerald-400">
-                      {candidate.openToWork ? 'OPEN TO WORK' : 'EMPLOYED'}
+                  <div className="pt-4 mt-6 border-t border-slate-800/80 flex items-center justify-between gap-3">
+                    <span className="text-[10px] font-extrabold uppercase tracking-wider text-emerald-400">
+                      Open to Work
                     </span>
 
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2.5">
                       <button
                         type="button"
-                        onClick={() => setSelectedCandidate(candidate)}
-                        className="px-4 py-2 rounded-full bg-indigo-600/20 hover:bg-indigo-600 border border-indigo-500/40 text-[10px] font-extrabold uppercase tracking-widest text-indigo-300 hover:text-white transition cursor-pointer"
+                        onClick={() => setSelectedCandidate(cand)}
+                        className="px-4 py-2 rounded-full bg-indigo-600 hover:bg-indigo-500 text-[11px] font-extrabold uppercase tracking-wider text-white transition cursor-pointer"
                       >
                         View Profile
                       </button>
-
-                      <Link
-                        href={`/messages?candidate=${encodeURIComponent(
-                          candidate.name
-                        )}`}
-                        className="px-5 py-2 rounded-full bg-slate-900 hover:bg-slate-700 border border-slate-700 text-[10px] font-extrabold uppercase tracking-widest text-white transition"
+                      <button
+                        type="button"
+                        onClick={() => setMessageTarget(cand)}
+                        className="px-4 py-2 rounded-full bg-slate-950 hover:bg-slate-800 border border-slate-700 text-[11px] font-extrabold uppercase tracking-wider text-slate-200 transition cursor-pointer"
                       >
                         Message
-                      </Link>
+                      </button>
                     </div>
                   </div>
                 </div>
               ))}
             </div>
-          ) : (
-            <div className="p-12 rounded-3xl bg-slate-800/30 border border-slate-800 text-center">
-              <p className="text-base font-extrabold text-white">
-                No candidate profiles found
-              </p>
-              <p className="text-xs text-slate-400 mt-1">
-                {candidates.length === 0
-                  ? 'No candidates have registered in candidate_profiles yet.'
-                  : 'Try clearing your search keyword or adjusting the filters.'}
-              </p>
-            </div>
           )}
-        </div>
+        </main>
       </div>
 
       {/* =====================================================================
-          FULL CANDIDATE PROFILE MODAL (Shows all candidate details from DB)
+          VIEW CANDIDATE PROFILE MODAL
          ===================================================================== */}
       {selectedCandidate && (
         <div
-          className="fixed inset-0 z-[999999] bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4"
+          className="fixed inset-0 z-[999999] bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 sm:p-6"
           onClick={() => setSelectedCandidate(null)}
         >
           <div
-            className="bg-slate-900 border border-slate-700 rounded-3xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-7 md:p-8 shadow-2xl relative"
+            className="group bg-slate-900 border border-slate-700/80 rounded-[2rem] max-w-3xl w-full max-h-[90vh] overflow-y-auto p-6 sm:p-8 shadow-2xl relative"
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Close Button */}
             <button
               type="button"
               onClick={() => setSelectedCandidate(null)}
-              className="absolute top-6 right-6 w-9 h-9 rounded-full bg-slate-800 border border-slate-700 text-slate-400 hover:text-white flex items-center justify-center cursor-pointer transition"
+              className="opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto absolute top-6 right-6 w-10 h-10 rounded-full bg-slate-800/90 border border-slate-700 text-slate-400 hover:text-white hover:bg-slate-700 flex items-center justify-center cursor-pointer transition-all duration-200 z-50"
             >
               ✕
             </button>
 
-            {/* Top Candidate Identity Header */}
-            <div className="flex flex-col sm:flex-row sm:items-center gap-5 pb-6 border-b border-slate-800 pr-10">
-              <div className="w-20 h-20 rounded-full bg-slate-800 border-2 border-indigo-500/40 flex items-center justify-center font-extrabold text-2xl text-white shrink-0 overflow-hidden">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-5 pb-6 border-b border-slate-800 pr-12">
+              <div className="w-20 h-20 rounded-full overflow-hidden bg-slate-800 border-2 border-emerald-500/60 flex items-center justify-center shrink-0">
                 {selectedCandidate.avatar ? (
                   <img
                     src={selectedCandidate.avatar}
-                    alt={selectedCandidate.name}
+                    alt={safeText(selectedCandidate.name)}
                     className="w-full h-full object-cover"
                   />
                 ) : (
-                  selectedCandidate.name.charAt(0).toUpperCase()
+                  <span className="text-2xl font-extrabold text-white">
+                    {safeText(selectedCandidate.name, 'U')
+                      .charAt(0)
+                      .toUpperCase()}
+                  </span>
                 )}
               </div>
 
-              <div className="min-w-0 flex-1">
+              <div className="flex-1">
                 <div className="flex flex-wrap items-center gap-2.5">
-                  <h2 className="text-2xl font-extrabold text-white">
-                    {selectedCandidate.name}
+                  <h2 className="text-xl font-extrabold text-white">
+                    {safeText(selectedCandidate.name, 'Candidate')}
                   </h2>
-                  <span
-                    className={`px-3 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider border ${
-                      selectedCandidate.workStatus === 'fresher'
-                        ? 'bg-amber-500/15 text-amber-300 border-amber-500/30'
-                        : 'bg-indigo-500/15 text-indigo-300 border-indigo-500/30'
-                    }`}
-                  >
-                    {selectedCandidate.workStatus === 'fresher'
-                      ? '🎓 Fresher'
-                      : '💼 Experienced'}
-                  </span>
-                  <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-[10px] font-extrabold uppercase tracking-wider text-emerald-400">
-                    {selectedCandidate.openToWork ? 'Open to Work' : 'Employed'}
+                  <span className="px-3 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-[10px] font-extrabold uppercase text-emerald-400">
+                    Open to Work
                   </span>
                 </div>
-
-                <p className="text-sm font-semibold text-slate-300 mt-1">
-                  {selectedCandidate.role}
+                <p className="text-sm font-bold text-slate-200 mt-1">
+                  {safeText(selectedCandidate.role, 'Software Professional')}
                   {selectedCandidate.company
-                    ? ` @ ${selectedCandidate.company}`
+                    ? ` at ${safeText(selectedCandidate.company)}`
                     : ''}
                 </p>
-                <p className="text-xs text-slate-400 mt-1">
-                  📍 {selectedCandidate.location || 'India'}
+                <p className="text-xs text-slate-400 mt-0.5">
+                  📍 {safeText(selectedCandidate.location, 'India')} • Updated:{' '}
+                  {safeText(selectedCandidate.updatedAt, 'Recently')}
                 </p>
               </div>
-            </div>
 
-            {/* Contact & Core Details Grid */}
-            <div className="py-6 border-b border-slate-800 grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
-              <div className="p-4 rounded-2xl bg-slate-800/50 border border-slate-800">
-                <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 block mb-1">
-                  Email Address
-                </span>
-                <span className="font-bold text-white break-all">
-                  {selectedCandidate.email || 'Not provided'}
-                </span>
-              </div>
-
-              <div className="p-4 rounded-2xl bg-slate-800/50 border border-slate-800">
-                <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 block mb-1">
-                  Mobile Number
-                </span>
-                <span className="font-bold text-white">
-                  {selectedCandidate.phone
-                    ? `+91 ${selectedCandidate.phone}`
-                    : 'Not provided'}
-                </span>
-              </div>
-
-              <div className="p-4 rounded-2xl bg-slate-800/50 border border-slate-800">
-                <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 block mb-1">
-                  Work Status
-                </span>
-                <span className="font-bold text-white">
-                  {selectedCandidate.workStatusLabel}
-                </span>
-              </div>
-
-              <div className="p-4 rounded-2xl bg-slate-800/50 border border-slate-800">
-                <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 block mb-1">
-                  Total Experience
-                </span>
-                <span className="font-bold text-white">
-                  {selectedCandidate.experience ||
-                    (selectedCandidate.workStatus === 'fresher'
-                      ? 'Fresher (0 Years)'
-                      : 'Experienced')}
-                </span>
-              </div>
-
-              {selectedCandidate.education && (
-                <div className="p-4 rounded-2xl bg-slate-800/50 border border-slate-800">
-                  <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 block mb-1">
-                    Education
-                  </span>
-                  <span className="font-bold text-white">
-                    {selectedCandidate.education}
-                    {selectedCandidate.college
-                      ? ` • ${selectedCandidate.college}`
-                      : ''}
-                  </span>
-                </div>
-              )}
-
-              {selectedCandidate.salary && (
-                <div className="p-4 rounded-2xl bg-slate-800/50 border border-slate-800">
-                  <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 block mb-1">
-                    Compensation / CTC
-                  </span>
-                  <span className="font-bold text-white">
-                    {selectedCandidate.salary}
-                  </span>
-                </div>
-              )}
-
-              {selectedCandidate.noticePeriod && (
-                <div className="p-4 rounded-2xl bg-slate-800/50 border border-slate-800">
-                  <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 block mb-1">
-                    Notice Period
-                  </span>
-                  <span className="font-bold text-white">
-                    {selectedCandidate.noticePeriod}
-                  </span>
-                </div>
+              {selectedCandidate.resumeUrl && (
+                <a
+                  href={selectedCandidate.resumeUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-5 py-2.5 rounded-full bg-blue-600 hover:bg-blue-500 text-xs font-extrabold text-white transition shadow-lg shrink-0 text-center"
+                >
+                  ↓ Download Resume
+                </a>
               )}
             </div>
 
-            {/* Bio / Profile Summary */}
-            <div className="py-5 border-b border-slate-800">
-              <h4 className="text-xs font-extrabold uppercase tracking-wider text-slate-400 mb-2">
-                Profile Summary
-              </h4>
-              <p className="text-xs text-slate-300 leading-relaxed">
-                {selectedCandidate.bio ||
-                  'No additional profile summary added by the candidate yet.'}
-              </p>
-            </div>
-
-            {/* Key Skills */}
-            <div className="py-5 border-b border-slate-800">
-              <h4 className="text-xs font-extrabold uppercase tracking-wider text-slate-400 mb-3">
-                Key Skills
-              </h4>
-              <div className="flex flex-wrap gap-2">
-                {selectedCandidate.skills &&
-                selectedCandidate.skills.length > 0 ? (
-                  selectedCandidate.skills.map((skill, index) => (
-                    <span
-                      key={index}
-                      className="px-3.5 py-1.5 rounded-full bg-slate-800 border border-slate-700 text-xs font-bold text-slate-200"
-                    >
-                      {skill}
-                    </span>
-                  ))
-                ) : (
-                  <span className="text-xs text-slate-400">
-                    No specific skills listed yet.
-                  </span>
-                )}
-              </div>
-            </div>
-
-            {/* Modal Footer: Resume / CV & Message Actions */}
-            <div className="pt-6 flex flex-wrap items-center justify-between gap-3">
-              <div>
-                {selectedCandidate.resumeUrl ? (
-                  <a
-                    href={selectedCandidate.resumeUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-bold text-indigo-400 transition"
-                  >
-                    <span>📄 View / Download CV</span>
-                  </a>
-                ) : (
-                  <span className="text-xs text-slate-500">
-                    CV / Resume not uploaded yet
-                  </span>
-                )}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 py-5 border-b border-slate-800 text-xs">
+              <div className="bg-slate-950/60 border border-slate-800/80 rounded-2xl p-3.5">
+                <span className="text-slate-400 block mb-1">Experience</span>
+                <span className="font-extrabold text-white">
+                  {safeText(selectedCandidate.experience, 'Experienced')}
+                </span>
               </div>
 
-              <div className="flex items-center gap-3">
+              <div className="bg-slate-950/60 border border-slate-800/80 rounded-2xl p-3.5">
+                <span className="text-slate-400 block mb-1">Annual Salary</span>
+                <span className="font-extrabold text-white">
+                  {safeText(selectedCandidate.salary, 'Not disclosed')}
+                </span>
+              </div>
+
+              <div className="bg-slate-950/60 border border-slate-800/80 rounded-2xl p-3.5">
+                <span className="text-slate-400 block mb-1">Notice Period</span>
+                <span className="font-extrabold text-white">
+                  {safeText(selectedCandidate.noticePeriod, 'Immediate')}
+                </span>
+              </div>
+
+              {/* Masked Email Card */}
+              <div className="bg-slate-950/60 border border-slate-800/80 rounded-2xl p-3.5 flex items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <span className="text-slate-400 block mb-1">Email</span>
+                  <span className="font-extrabold text-white truncate block">
+                    {maskEmail(selectedCandidate.email)}
+                  </span>
+                </div>
                 <button
                   type="button"
-                  onClick={() => setSelectedCandidate(null)}
-                  className="px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-bold text-slate-300 transition cursor-pointer"
+                  onClick={handleRedirectToBuyPlan}
+                  className="px-3 py-1.5 rounded-xl bg-blue-600/20 hover:bg-blue-600 border border-blue-500/40 text-[11px] font-extrabold text-blue-300 hover:text-white transition shrink-0 cursor-pointer"
+                  title="Buy a plan to view full email"
                 >
-                  Close
+                  View
                 </button>
-                <Link
-                  href={`/messages?candidate=${encodeURIComponent(
-                    selectedCandidate.name
-                  )}`}
-                  className="px-6 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-xs font-extrabold uppercase tracking-wider text-white transition shadow-lg"
+              </div>
+
+              {/* Masked Phone Card */}
+              <div className="bg-slate-950/60 border border-slate-800/80 rounded-2xl p-3.5 flex items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <span className="text-slate-400 block mb-1">Phone</span>
+                  <span className="font-extrabold text-white truncate block">
+                    {maskPhone(selectedCandidate.phone)}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleRedirectToBuyPlan}
+                  className="px-3 py-1.5 rounded-xl bg-blue-600/20 hover:bg-blue-600 border border-blue-500/40 text-[11px] font-extrabold text-blue-300 hover:text-white transition shrink-0 cursor-pointer"
+                  title="Buy a plan to view mobile number"
                 >
-                  Message Candidate
-                </Link>
+                  View
+                </button>
+              </div>
+
+              <div className="bg-slate-950/60 border border-slate-800/80 rounded-2xl p-3.5">
+                <span className="text-slate-400 block mb-1">Education</span>
+                <span className="font-extrabold text-white">
+                  {safeText(selectedCandidate.education, 'Not specified')}
+                </span>
               </div>
             </div>
+
+            <div className="space-y-6 pt-6 text-xs">
+              {(selectedCandidate.headline || selectedCandidate.bio) && (
+                <div>
+                  <h4 className="text-sm font-extrabold text-white mb-2">
+                    Profile Summary
+                  </h4>
+                  {selectedCandidate.headline && (
+                    <p className="font-bold text-slate-200 mb-1.5">
+                      {safeText(selectedCandidate.headline)}
+                    </p>
+                  )}
+                  {selectedCandidate.bio && (
+                    <p className="text-slate-300 leading-relaxed whitespace-pre-line">
+                      {safeText(selectedCandidate.bio)}
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {Array.isArray(selectedCandidate.skills) &&
+                selectedCandidate.skills.length > 0 && (
+                  <div>
+                    <h4 className="text-sm font-extrabold text-white mb-2.5">
+                      Key Skills
+                    </h4>
+                    <div className="flex flex-wrap gap-2">
+                      {selectedCandidate.skills.map((s, idx) => (
+                        <span
+                          key={idx}
+                          className="px-3.5 py-1.5 rounded-full bg-slate-800 border border-slate-700 text-xs font-semibold text-slate-200"
+                        >
+                          {safeText(s)}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+              {Array.isArray(selectedCandidate.employmentList) &&
+                selectedCandidate.employmentList.length > 0 && (
+                  <div>
+                    <h4 className="text-sm font-extrabold text-white mb-3">
+                      Work Experience
+                    </h4>
+                    <div className="space-y-4">
+                      {selectedCandidate.employmentList.map(
+                        (emp: any, idx: number) => (
+                          <div
+                            key={emp?.id || idx}
+                            className="bg-slate-950/60 border border-slate-800 rounded-2xl p-4"
+                          >
+                            <p className="text-sm font-extrabold text-white">
+                              {safeText(emp?.designation, 'Role')}
+                            </p>
+                            <p className="text-xs font-bold text-slate-300 mt-0.5">
+                              {safeText(emp?.company)}
+                            </p>
+                            <p className="text-[11px] text-slate-400 mt-0.5">
+                              {safeText(emp?.employmentType, 'Full-time')}
+                              {emp?.startDate
+                                ? ` | ${safeText(emp.startDate)} to ${safeText(
+                                    emp.endDate,
+                                    'Present'
+                                  )}`
+                                : ''}
+                            </p>
+                            {emp?.description && (
+                              <p className="text-xs text-slate-300 mt-2 leading-relaxed whitespace-pre-line">
+                                {safeText(emp.description)}
+                              </p>
+                            )}
+                          </div>
+                        )
+                      )}
+                    </div>
+                  </div>
+                )}
+
+              {Array.isArray(selectedCandidate.educationList) &&
+                selectedCandidate.educationList.length > 0 && (
+                  <div>
+                    <h4 className="text-sm font-extrabold text-white mb-3">
+                      Education Details
+                    </h4>
+                    <div className="space-y-3">
+                      {selectedCandidate.educationList.map(
+                        (edu: any, idx: number) => (
+                          <div
+                            key={edu?.id || idx}
+                            className="bg-slate-950/60 border border-slate-800 rounded-2xl p-4"
+                          >
+                            <p className="text-sm font-extrabold text-white">
+                              {safeText(
+                                edu?.degree ||
+                                  `${safeText(edu?.course)} ${safeText(
+                                    edu?.specialization
+                                  )}`,
+                                'Degree'
+                              )}
+                            </p>
+                            <p className="text-xs text-slate-300 mt-0.5">
+                              {safeText(edu?.institute)}
+                            </p>
+                            <p className="text-[11px] text-slate-400 mt-0.5">
+                              {safeText(edu?.yearRange)}
+                              {edu?.courseType
+                                ? ` | ${safeText(edu.courseType)}`
+                                : ''}
+                            </p>
+                          </div>
+                        )
+                      )}
+                    </div>
+                  </div>
+                )}
+
+              {Array.isArray(selectedCandidate.itSkills) &&
+                selectedCandidate.itSkills.length > 0 && (
+                  <div>
+                    <h4 className="text-sm font-extrabold text-white mb-3">
+                      IT Skills
+                    </h4>
+                    <div className="flex flex-wrap gap-2">
+                      {selectedCandidate.itSkills.map(
+                        (item: any, idx: number) => (
+                          <span
+                            key={item?.id || idx}
+                            className="px-3.5 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-xs text-slate-200"
+                          >
+                            <strong>{safeText(item?.skill)}</strong>
+                            {item?.experience
+                              ? ` (${safeText(item.experience)})`
+                              : ''}
+                          </span>
+                        )
+                      )}
+                    </div>
+                  </div>
+                )}
+            </div>
+
+            <div className="pt-6 mt-6 border-t border-slate-800 flex flex-wrap items-center justify-end gap-3">
+              <button
+                type="button"
+                onClick={handleRedirectToBuyPlan}
+                className="px-6 py-2.5 rounded-full bg-blue-600 hover:bg-blue-500 text-xs font-extrabold text-white transition shadow-lg shadow-blue-600/25 cursor-pointer"
+              >
+                🔒 View Email &amp; Mobile Number
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const target = selectedCandidate;
+                  setSelectedCandidate(null);
+                  setMessageTarget(target);
+                }}
+                className="px-6 py-2.5 rounded-full bg-indigo-600 hover:bg-indigo-500 text-xs font-extrabold text-white transition cursor-pointer"
+              >
+                Message Candidate
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* =====================================================================
+          DIRECT MESSAGE MODAL
+         ===================================================================== */}
+      {messageTarget && (
+        <div
+          className="fixed inset-0 z-[999999] bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4"
+          onClick={() => setMessageTarget(null)}
+        >
+          <div
+            className="group bg-slate-900 border border-slate-700 rounded-3xl max-w-lg w-full p-7 shadow-2xl relative"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              type="button"
+              onClick={() => setMessageTarget(null)}
+              className="opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto absolute top-6 right-6 w-9 h-9 rounded-full bg-slate-800 border border-slate-700 text-slate-400 hover:text-white flex items-center justify-center cursor-pointer transition-all"
+            >
+              ✕
+            </button>
+
+            <h3 className="text-lg font-extrabold text-white pr-10">
+              Message {safeText(messageTarget.name)}
+            </h3>
+            <p className="text-xs text-slate-400 mt-1 mb-5">
+              Send a direct recruitment invitation or interview request to{' '}
+              {maskEmail(messageTarget.email)}.
+            </p>
+
+            <form onSubmit={handleSendMessage} className="space-y-4">
+              <textarea
+                rows={4}
+                required
+                value={messageText}
+                onChange={(e) => setMessageText(e.target.value)}
+                placeholder="Write your message or job opportunity details..."
+                className="w-full bg-slate-950 border border-slate-700 rounded-2xl p-4 text-sm text-white placeholder:text-slate-500 outline-none focus:border-indigo-500"
+              />
+              <div className="flex justify-end">
+                <button
+                  type="submit"
+                  disabled={sendingMsg}
+                  className="px-6 py-2.5 rounded-full bg-indigo-600 hover:bg-indigo-500 disabled:bg-indigo-600/50 text-xs font-extrabold text-white transition cursor-pointer"
+                >
+                  {sendingMsg ? 'Sending...' : 'Send Message'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

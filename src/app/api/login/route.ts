@@ -15,13 +15,13 @@ export async function POST(request: Request) {
     }
 
     const users = await sql`
-      SELECT id, email, password, role
+      SELECT *
       FROM users
       WHERE LOWER(TRIM(email)) = ${email}
       LIMIT 1
     `;
 
-    if (users.length === 0 || users[0].password !== password) {
+    if (users.length === 0) {
       return NextResponse.json(
         { error: 'Invalid email or password.' },
         { status: 401 }
@@ -29,21 +29,32 @@ export async function POST(request: Request) {
     }
 
     const user = users[0];
+    const storedPassword = user.password_hash ?? user.password ?? '';
+
+    if (String(storedPassword) !== password) {
+      return NextResponse.json(
+        { error: 'Invalid email or password.' },
+        { status: 401 }
+      );
+    }
+
     const role = String(user.role || 'CANDIDATE').toUpperCase();
-    let name = '';
+    let name = user.name || '';
     let avatar = '';
     let phone = '';
+    let companyName = '';
 
     if (role === 'EMPLOYER') {
       try {
         const emp = await sql`
-          SELECT full_name, company_name, phone, avatar
+          SELECT *
           FROM employer_profiles
           WHERE user_id = ${user.id}
           LIMIT 1
         `;
         if (emp.length > 0) {
-          name = emp[0].full_name || emp[0].company_name || '';
+          name = emp[0].full_name || emp[0].company_name || name;
+          companyName = emp[0].company_name || '';
           phone = emp[0].phone || '';
           avatar = emp[0].avatar || '';
         }
@@ -51,33 +62,38 @@ export async function POST(request: Request) {
     } else {
       try {
         const cand = await sql`
-          SELECT name, phone, avatar
+          SELECT *
           FROM candidate_profiles
           WHERE user_id = ${user.id}
           LIMIT 1
         `;
         if (cand.length > 0) {
-          name = cand[0].name || '';
+          name = cand[0].name || name;
           phone = cand[0].phone || '';
           avatar = cand[0].avatar || '';
         }
       } catch {}
     }
 
+    const userPayload = {
+      id: user.id,
+      email: user.email,
+      role,
+      name,
+      companyName,
+      phone,
+      avatar,
+    };
+
     return NextResponse.json({
-      user: {
-        id: user.id,
-        email: user.email,
-        role,
-        name,
-        phone,
-        avatar,
-      },
+      success: true,
+      ...userPayload,
+      user: userPayload,
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error('POST /api/login error:', error);
     return NextResponse.json(
-      { error: 'Authentication failed.' },
+      { error: error?.message || 'Authentication failed.' },
       { status: 500 }
     );
   }

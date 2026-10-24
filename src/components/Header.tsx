@@ -8,6 +8,129 @@ interface HeaderProps {
   isGlobal?: boolean;
 }
 
+interface CandidateApplicantDetails {
+  applicationId: number | null;
+  applicationStatus: string;
+  appliedAt: string;
+  jobId: number | null;
+  jobTitle: string;
+  jobLocation: string;
+  name: string;
+  email: string;
+  phone: string;
+  location: string;
+  role: string;
+  company: string;
+  experience: string;
+  salary: string;
+  noticePeriod: string;
+  headline: string;
+  bio: string;
+  education: string;
+  college: string;
+  avatar: string;
+  resumeUrl: string;
+  resumeName: string;
+  skills: string[];
+  employmentList: any[];
+  educationList: any[];
+  itSkills: any[];
+}
+
+interface NotificationMessage {
+  id: number;
+  notifType?: string;
+  jobId?: number | null;
+  applicationId?: number | null;
+  senderEmail: string;
+  senderName: string;
+  senderCompany: string;
+  receiverEmail: string;
+  subject: string;
+  body: string;
+  isRead: boolean;
+  createdAt: string;
+  candidateDetails?: CandidateApplicantDetails | null;
+}
+
+/**
+ * Masks any email address, numeric phone number, and spelled-out phone number
+ * for Candidates reading recruiter messages.
+ */
+function maskMessageContentClient(text: string): string {
+  if (!text) return '';
+  let result = text;
+
+  result = result.replace(
+    /\b([a-zA-Z0-9._%+-]+)@([a-zA-Z0-9.-]+\.[a-zA-Z]{2,})\b/g,
+    (match) => {
+      const [local, domain] = match.split('@');
+      if (!local || !domain) return match;
+      if (local.length >= 6) {
+        return `${local.slice(0, 2)}***${local[Math.ceil(local.length / 2)]}***@${domain}`;
+      }
+      if (local.length > 2) {
+        return `${local.slice(0, 2)}***@${domain}`;
+      }
+      return `${local.charAt(0)}***@${domain}`;
+    }
+  );
+
+  const wordToDigit: Record<string, string> = {
+    zero: '0',
+    oh: '0',
+    one: '1',
+    two: '2',
+    three: '3',
+    four: '4',
+    five: '5',
+    six: '6',
+    seven: '7',
+    eight: '8',
+    nine: '9',
+  };
+  const numberWordPattern =
+    /\b(?:(?:zero|oh|one|two|three|four|five|six|seven|eight|nine|double|triple)[\s,-]*){6,15}\b/gi;
+
+  result = result.replace(numberWordPattern, (match) => {
+    const tokens = match
+      .toLowerCase()
+      .trim()
+      .split(/[\s,-]+/);
+    let digits = '';
+    for (let i = 0; i < tokens.length; i++) {
+      const tok = tokens[i];
+      if ((tok === 'double' || tok === 'triple') && i + 1 < tokens.length) {
+        const nextDigit = wordToDigit[tokens[i + 1]];
+        if (nextDigit !== undefined) {
+          digits += nextDigit.repeat(tok === 'double' ? 2 : 3);
+          i++;
+          continue;
+        }
+      }
+      if (wordToDigit[tok] !== undefined) {
+        digits += wordToDigit[tok];
+      }
+    }
+    if (digits.length >= 6) {
+      return `+91-******${digits.slice(-4)}`;
+    }
+    return match;
+  });
+
+  result = result.replace(
+    /(?:\+?91[\s.-]?)?\b([6-9]\d{5})(\d{4})\b/g,
+    (_m, _p1, lastFour) => `+91-******${lastFour}`
+  );
+
+  result = result.replace(
+    /\b(?:\d[\s-]?){6,9}(\d{4})\b/g,
+    (_match, lastFour) => `+91-******${lastFour}`
+  );
+
+  return result;
+}
+
 export default function Header({ accentColor, isGlobal = false }: HeaderProps) {
   const pathname = usePathname();
   const router = useRouter();
@@ -32,6 +155,16 @@ export default function Header({ accentColor, isGlobal = false }: HeaderProps) {
   >(null);
   const [expandSettings, setExpandSettings] = useState(false);
 
+  // Notifications & Modal States
+  const [messages, setMessages] = useState<NotificationMessage[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [activeMessageModal, setActiveMessageModal] =
+    useState<NotificationMessage | null>(null);
+  const [updatingStatus, setUpdatingStatus] = useState(false);
+  const [replyText, setReplyText] = useState('');
+  const [sendingReply, setSendingReply] = useState(false);
+  const [headerToast, setHeaderToast] = useState('');
+
   const navRef = useRef<HTMLDivElement>(null);
   const drawerRef = useRef<HTMLDivElement>(null);
 
@@ -46,6 +179,31 @@ export default function Header({ accentColor, isGlobal = false }: HeaderProps) {
   const resolvedAccent = accentColor || (isEmployerUser ? 'indigo' : 'pink');
   const dotColor =
     resolvedAccent === 'indigo' ? 'text-indigo-500' : 'text-pink-500';
+
+  const triggerToast = (msg: string) => {
+    setHeaderToast(msg);
+    setTimeout(() => setHeaderToast(''), 3200);
+  };
+
+  const fetchNotifications = async (targetEmail?: string) => {
+    const emailToQuery = targetEmail || profile.email;
+    if (!emailToQuery) return;
+    try {
+      const res = await fetch(
+        `/api/messages?email=${encodeURIComponent(emailToQuery)}`,
+        { cache: 'no-store' }
+      );
+      const data = await res.json();
+      if (data && Array.isArray(data.messages)) {
+        setMessages(data.messages);
+        setUnreadCount(
+          typeof data.unreadCount === 'number'
+            ? data.unreadCount
+            : data.messages.filter((m: NotificationMessage) => !m.isRead).length
+        );
+      }
+    } catch {}
+  };
 
   // Load user session & profile details
   useEffect(() => {
@@ -84,12 +242,16 @@ export default function Header({ accentColor, isGlobal = false }: HeaderProps) {
                 }
               })
               .catch(() => {});
+
+            fetchNotifications(parsedUser.email);
           }
         } catch {
           setIsLoggedIn(false);
         }
       } else {
         setIsLoggedIn(false);
+        setMessages([]);
+        setUnreadCount(0);
       }
     };
 
@@ -118,6 +280,16 @@ export default function Header({ accentColor, isGlobal = false }: HeaderProps) {
       window.removeEventListener('storage', loadUserAndProfile);
     };
   }, [pathname, isGlobal]);
+
+  // Poll notifications every 6 seconds when logged in
+  useEffect(() => {
+    if (!isGlobal || !isLoggedIn || !profile.email) return;
+    fetchNotifications(profile.email);
+    const interval = setInterval(() => {
+      fetchNotifications(profile.email);
+    }, 6000);
+    return () => clearInterval(interval);
+  }, [isGlobal, isLoggedIn, profile.email]);
 
   // Hide duplicate inline ROLEMATCH. headers inside <main>
   useEffect(() => {
@@ -189,6 +361,103 @@ export default function Header({ accentColor, isGlobal = false }: HeaderProps) {
     return null;
   }
 
+  const handleOpenMessage = async (msg: NotificationMessage) => {
+    setShowNotifications(false);
+    setReplyText('');
+    setActiveMessageModal(msg);
+
+    if (!msg.isRead) {
+      setMessages((prev) =>
+        prev.map((m) => (m.id === msg.id ? { ...m, isRead: true } : m))
+      );
+      setUnreadCount((prev) => Math.max(0, prev - 1));
+
+      try {
+        await fetch('/api/messages', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: msg.id }),
+        });
+      } catch {}
+    }
+  };
+
+  const handleUpdateApplicantStatus = async (newStatus: string) => {
+    if (!activeMessageModal?.candidateDetails) return;
+    const cd = activeMessageModal.candidateDetails;
+    setUpdatingStatus(true);
+
+    try {
+      const res = await fetch('/api/jobs', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'updateApplicationStatus',
+          applicationId: cd.applicationId,
+          jobId: cd.jobId,
+          candidateEmail: cd.email,
+          jobTitle: cd.jobTitle,
+          companyName: profile.name || 'Hiring Team',
+          employerEmail: profile.email,
+          status: newStatus,
+        }),
+      });
+
+      if (res.ok) {
+        const updatedModal: NotificationMessage = {
+          ...activeMessageModal,
+          candidateDetails: {
+            ...cd,
+            applicationStatus: newStatus,
+          },
+        };
+        setActiveMessageModal(updatedModal);
+        setMessages((prev) =>
+          prev.map((m) => (m.id === updatedModal.id ? updatedModal : m))
+        );
+        triggerToast(`Candidate marked as ${newStatus}!`);
+      }
+    } catch (err) {
+      console.error('Status update error:', err);
+    } finally {
+      setUpdatingStatus(false);
+    }
+  };
+
+  const handleSendDirectReplyToCandidate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!activeMessageModal || !replyText.trim()) return;
+
+    const cd = activeMessageModal.candidateDetails;
+    const targetEmail = cd?.email || activeMessageModal.senderEmail;
+    if (!targetEmail) return;
+
+    setSendingReply(true);
+    try {
+      const res = await fetch('/api/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          senderEmail: profile.email,
+          senderName: profile.name || 'Hiring Manager',
+          senderCompany: profile.name || 'Verified Employer',
+          receiverEmail: targetEmail,
+          subject: `Regarding your application for ${cd?.jobTitle || 'our open role'}`,
+          message: replyText.trim(),
+        }),
+      });
+
+      if (res.ok) {
+        setReplyText('');
+        triggerToast(`Message sent to ${cd?.name || 'Candidate'}!`);
+      }
+    } catch (err) {
+      console.error('Error sending reply:', err);
+    } finally {
+      setSendingReply(false);
+    }
+  };
+
   const handleLogout = () => {
     localStorage.removeItem('user');
     setIsLoggedIn(false);
@@ -210,6 +479,13 @@ export default function Header({ accentColor, isGlobal = false }: HeaderProps) {
 
   return (
     <>
+      {headerToast && (
+        <div className="fixed bottom-6 right-6 z-[99999999] bg-emerald-600 text-white px-5 py-3.5 rounded-2xl shadow-2xl text-xs font-extrabold flex items-center gap-2.5">
+          <span>✓</span>
+          <span>{headerToast}</span>
+        </div>
+      )}
+
       <header className="w-full px-8 py-4 md:px-12 md:py-5 flex items-center justify-between z-[99999] bg-slate-900 border-b border-slate-800/80 relative">
         <nav
           className="flex justify-between items-center w-full relative gap-6"
@@ -481,14 +757,19 @@ export default function Header({ accentColor, isGlobal = false }: HeaderProps) {
                   </Link>
                 )}
 
-                {/* 1. NOTIFICATIONS BELL */}
+                {/* 1. NOTIFICATIONS BELL WITH UNREAD COUNTER */}
                 <div className="relative">
                   <button
                     onClick={() => {
-                      setShowNotifications(!showNotifications);
+                      const nextOpen = !showNotifications;
+                      setShowNotifications(nextOpen);
                       setShowProfileDrawer(false);
+                      if (nextOpen && profile.email) {
+                        fetchNotifications(profile.email);
+                      }
                     }}
                     className="text-slate-400 hover:text-white relative p-2 cursor-pointer"
+                    title="Notifications"
                   >
                     <svg
                       className="w-6 h-6"
@@ -503,20 +784,131 @@ export default function Header({ accentColor, isGlobal = false }: HeaderProps) {
                         d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
                       ></path>
                     </svg>
+
+                    {unreadCount > 0 && (
+                      <span className="absolute top-0.5 right-0.5 min-w-[18px] h-[18px] px-1 rounded-full bg-red-600 text-white text-[10px] font-extrabold flex items-center justify-center shadow-lg">
+                        {unreadCount}
+                      </span>
+                    )}
                   </button>
 
                   {showNotifications && (
-                    <div className="absolute right-0 mt-3 w-80 sm:w-96 bg-slate-800 border border-slate-700 rounded-2xl shadow-2xl z-[999999] overflow-hidden">
+                    <div className="absolute right-0 mt-3 w-80 sm:w-[420px] bg-slate-800 border border-slate-700 rounded-2xl shadow-2xl z-[999999] overflow-hidden">
                       <div className="p-4 border-b border-slate-700/80 flex justify-between items-center bg-slate-800/50">
                         <span className="font-bold text-white text-sm">
-                          Notifications
+                          {isEmployerUser
+                            ? 'Applicant & ATS Notifications'
+                            : 'Notifications'}
                         </span>
+                        {unreadCount > 0 && (
+                          <span className="px-2.5 py-0.5 rounded-full bg-red-500/20 border border-red-500/30 text-[11px] font-extrabold text-red-300">
+                            {unreadCount} new
+                          </span>
+                        )}
                       </div>
-                      <div className="max-h-[350px] overflow-y-auto">
-                        <div className="p-4 text-sm text-slate-400">
-                          No new notifications right now.
+
+                      <div className="max-h-[380px] overflow-y-auto divide-y divide-slate-700/60">
+                        {messages.length === 0 ? (
+                          <div className="p-5 text-sm text-slate-400">
+                            No new notifications right now.
+                          </div>
+                        ) : (
+                          messages.map((msg) => {
+                            const cd = msg.candidateDetails;
+                            return (
+                              <button
+                                key={msg.id}
+                                type="button"
+                                onClick={() => handleOpenMessage(msg)}
+                                className={`w-full text-left p-4 hover:bg-slate-700/60 transition-colors flex items-start gap-3.5 cursor-pointer ${
+                                  !msg.isRead ? 'bg-indigo-500/10' : ''
+                                }`}
+                              >
+                                <div className="w-10 h-10 rounded-full overflow-hidden bg-indigo-600/20 border border-indigo-500/40 text-indigo-300 font-extrabold text-xs flex items-center justify-center shrink-0 mt-0.5">
+                                  {cd?.avatar ? (
+                                    <img
+                                      src={cd.avatar}
+                                      alt={cd.name}
+                                      className="w-full h-full object-cover"
+                                    />
+                                  ) : (
+                                    <span>
+                                      {(
+                                        cd?.name ||
+                                        msg.senderName ||
+                                        'U'
+                                      )
+                                        .charAt(0)
+                                        .toUpperCase()}
+                                    </span>
+                                  )}
+                                </div>
+
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center justify-between gap-2">
+                                    <p className="text-xs font-extrabold text-white truncate">
+                                      {cd?.name || msg.senderName}
+                                    </p>
+                                    <div className="flex items-center gap-1.5 shrink-0">
+                                      {cd?.applicationStatus && (
+                                        <span className="px-2 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-[9px] font-extrabold uppercase text-emerald-300">
+                                          {cd.applicationStatus}
+                                        </span>
+                                      )}
+                                      {!msg.isRead && (
+                                        <span className="w-2 h-2 rounded-full bg-blue-500 shrink-0" />
+                                      )}
+                                    </div>
+                                  </div>
+
+                                  {cd ? (
+                                    <>
+                                      <p className="text-[11px] font-bold text-indigo-300 truncate mt-0.5">
+                                        Applied for: {cd.jobTitle}
+                                      </p>
+                                      <p className="text-[11px] text-slate-300 truncate mt-0.5">
+                                        {cd.role} • {cd.experience} • Notice:{' '}
+                                        {cd.noticePeriod}
+                                      </p>
+                                      <p className="text-[10px] text-blue-400 font-extrabold mt-1.5">
+                                        View candidate profile, contact &amp; CV
+                                        &rarr;
+                                      </p>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <p className="text-xs text-slate-300 line-clamp-2 mt-1 leading-relaxed">
+                                        {isEmployerUser
+                                          ? msg.body
+                                          : maskMessageContentClient(msg.body)}
+                                      </p>
+                                      <p className="text-[10px] text-blue-400 font-semibold mt-1.5">
+                                        Click to read details &rarr;
+                                      </p>
+                                    </>
+                                  )}
+                                </div>
+                              </button>
+                            );
+                          })
+                        )}
+                      </div>
+
+                      {messages.length > 0 && (
+                        <div className="p-3 border-t border-slate-700/80 bg-slate-900/50 text-center">
+                          <Link
+                            href={
+                              isEmployerUser ? '/employer/jobs' : '/messages'
+                            }
+                            onClick={() => setShowNotifications(false)}
+                            className="text-xs font-bold text-blue-400 hover:text-blue-300"
+                          >
+                            {isEmployerUser
+                              ? 'Manage All Jobs & Applicant Responses →'
+                              : 'View all messages'}
+                          </Link>
                         </div>
-                      </div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -560,7 +952,7 @@ export default function Header({ accentColor, isGlobal = false }: HeaderProps) {
                 </div>
               </>
             ) : (
-              /* LOGGED OUT ACTIONS (Removed 'Register' button & 'Employer Login' dropdown item) */
+              /* LOGGED OUT ACTIONS */
               <div className="flex items-center gap-6 pl-5 border-l border-slate-700">
                 <Link
                   href="/login"
@@ -600,6 +992,408 @@ export default function Header({ accentColor, isGlobal = false }: HeaderProps) {
           </div>
         </nav>
       </header>
+
+      {/* =====================================================================
+          NOTIFICATION MODAL:
+          - EMPLOYER: Full Enterprise Applicant Review & ATS Modal (Unmasked Contact + CV)
+          - CANDIDATE: Masked Recruiter Message Reader Modal
+         ===================================================================== */}
+      {activeMessageModal && (
+        <div
+          className="fixed inset-0 z-[9999999] bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 sm:p-6"
+          onClick={() => setActiveMessageModal(null)}
+        >
+          {isEmployerUser && activeMessageModal.candidateDetails ? (
+            /* EMPLOYER ENTERPRISE APPLICANT PROFILE & ATS MODAL */
+            <div
+              className="group bg-slate-900 border border-slate-700/90 rounded-[2rem] max-w-3xl w-full max-h-[90vh] overflow-y-auto p-6 sm:p-8 shadow-2xl relative text-slate-100"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <button
+                type="button"
+                onClick={() => setActiveMessageModal(null)}
+                className="opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto absolute top-6 right-6 w-10 h-10 rounded-full bg-slate-800 border border-slate-700 text-slate-400 hover:text-white flex items-center justify-center cursor-pointer transition-all z-50"
+              >
+                ✕
+              </button>
+
+              {/* Top Applied Job Banner */}
+              <div className="mb-5 px-4 py-2.5 rounded-2xl bg-indigo-500/10 border border-indigo-500/30 flex flex-wrap items-center justify-between gap-2 pr-12">
+                <div className="flex items-center gap-2 text-xs">
+                  <span className="px-2.5 py-0.5 rounded-full bg-indigo-600 text-white font-extrabold text-[10px] uppercase">
+                    Job Applicant
+                  </span>
+                  <span className="text-slate-300 font-semibold">
+                    Applied for{' '}
+                    <strong className="text-white">
+                      {activeMessageModal.candidateDetails.jobTitle}
+                    </strong>
+                  </span>
+                </div>
+                {activeMessageModal.candidateDetails.jobId && (
+                  <Link
+                    href={`/employer/jobs/${activeMessageModal.candidateDetails.jobId}/applicants`}
+                    onClick={() => setActiveMessageModal(null)}
+                    className="text-xs font-extrabold text-indigo-400 hover:text-indigo-300 underline"
+                  >
+                    Open Full ATS Pipeline &rarr;
+                  </Link>
+                )}
+              </div>
+
+              {/* Candidate Identity Header */}
+              <div className="flex flex-col sm:flex-row sm:items-center gap-5 pb-6 border-b border-slate-800">
+                <div className="w-20 h-20 rounded-full overflow-hidden bg-slate-800 border-2 border-emerald-500/60 flex items-center justify-center shrink-0">
+                  {activeMessageModal.candidateDetails.avatar ? (
+                    <img
+                      src={activeMessageModal.candidateDetails.avatar}
+                      alt={activeMessageModal.candidateDetails.name}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <span className="text-2xl font-extrabold text-white">
+                      {activeMessageModal.candidateDetails.name
+                        .charAt(0)
+                        .toUpperCase()}
+                    </span>
+                  )}
+                </div>
+
+                <div className="flex-1 min-w-0">
+                  <div className="flex flex-wrap items-center gap-2.5">
+                    <h2 className="text-xl font-extrabold text-white">
+                      {activeMessageModal.candidateDetails.name}
+                    </h2>
+                    <span className="px-3 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-[10px] font-extrabold uppercase text-emerald-400">
+                      {activeMessageModal.candidateDetails.applicationStatus}
+                    </span>
+                  </div>
+                  <p className="text-sm font-bold text-slate-200 mt-1">
+                    {activeMessageModal.candidateDetails.role}
+                    {activeMessageModal.candidateDetails.company
+                      ? ` at ${activeMessageModal.candidateDetails.company}`
+                      : ''}
+                  </p>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    📍 {activeMessageModal.candidateDetails.location}
+                  </p>
+                </div>
+
+                {activeMessageModal.candidateDetails.resumeUrl && (
+                  <a
+                    href={activeMessageModal.candidateDetails.resumeUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-5 py-2.5 rounded-full bg-blue-600 hover:bg-blue-500 text-xs font-extrabold text-white transition shadow-lg shrink-0 text-center"
+                  >
+                    ↓ Download Resume
+                  </a>
+                )}
+              </div>
+
+              {/* Enterprise ATS Stage Action Bar */}
+              <div className="py-4 border-b border-slate-800 flex flex-wrap items-center justify-between gap-3">
+                <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-400">
+                  Move Applicant Stage:
+                </span>
+                <div className="flex flex-wrap items-center gap-2">
+                  {(
+                    [
+                      { key: 'SHORTLISTED', label: '✓ Shortlist' },
+                      { key: 'INTERVIEW', label: '📅 Interview' },
+                      { key: 'OFFERED', label: '🎉 Offer' },
+                      { key: 'REJECTED', label: '✕ Reject' },
+                    ] as const
+                  ).map((st) => {
+                    const isCurrent =
+                      activeMessageModal.candidateDetails?.applicationStatus ===
+                      st.key;
+                    return (
+                      <button
+                        key={st.key}
+                        type="button"
+                        disabled={updatingStatus}
+                        onClick={() => handleUpdateApplicantStatus(st.key)}
+                        className={`px-3.5 py-1.5 rounded-full text-xs font-extrabold border transition cursor-pointer ${
+                          isCurrent
+                            ? st.key === 'REJECTED'
+                              ? 'bg-red-600 border-red-500 text-white'
+                              : 'bg-emerald-600 border-emerald-500 text-white'
+                            : 'bg-slate-950 border-slate-700 text-slate-300 hover:border-slate-500 hover:text-white'
+                        }`}
+                      >
+                        {st.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Unmasked Contact & Compensation Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 py-5 border-b border-slate-800 text-xs">
+                <div className="bg-slate-950/70 border border-emerald-500/30 rounded-2xl p-3.5">
+                  <span className="text-slate-400 block mb-1">
+                    Email (Unmasked)
+                  </span>
+                  <a
+                    href={`mailto:${activeMessageModal.candidateDetails.email}`}
+                    className="font-extrabold text-emerald-400 hover:underline break-all"
+                  >
+                    {activeMessageModal.candidateDetails.email}
+                  </a>
+                </div>
+
+                <div className="bg-slate-950/70 border border-emerald-500/30 rounded-2xl p-3.5">
+                  <span className="text-slate-400 block mb-1">
+                    Mobile Number (Unmasked)
+                  </span>
+                  <a
+                    href={`tel:${activeMessageModal.candidateDetails.phone}`}
+                    className="font-extrabold text-emerald-400 hover:underline"
+                  >
+                    {activeMessageModal.candidateDetails.phone}
+                  </a>
+                </div>
+
+                <div className="bg-slate-950/70 border border-slate-800 rounded-2xl p-3.5">
+                  <span className="text-slate-400 block mb-1">
+                    Total Experience
+                  </span>
+                  <span className="font-extrabold text-white">
+                    {activeMessageModal.candidateDetails.experience}
+                  </span>
+                </div>
+
+                <div className="bg-slate-950/70 border border-slate-800 rounded-2xl p-3.5">
+                  <span className="text-slate-400 block mb-1">
+                    Current Annual Salary
+                  </span>
+                  <span className="font-extrabold text-white">
+                    {activeMessageModal.candidateDetails.salary}
+                  </span>
+                </div>
+
+                <div className="bg-slate-950/70 border border-slate-800 rounded-2xl p-3.5">
+                  <span className="text-slate-400 block mb-1">
+                    Notice Period
+                  </span>
+                  <span className="font-extrabold text-white">
+                    {activeMessageModal.candidateDetails.noticePeriod}
+                  </span>
+                </div>
+
+                <div className="bg-slate-950/70 border border-slate-800 rounded-2xl p-3.5">
+                  <span className="text-slate-400 block mb-1">Education</span>
+                  <span className="font-extrabold text-white">
+                    {activeMessageModal.candidateDetails.education}
+                  </span>
+                </div>
+              </div>
+
+              {/* Candidate Summary, Skills & Experience */}
+              <div className="space-y-5 pt-5 text-xs">
+                {(activeMessageModal.candidateDetails.headline ||
+                  activeMessageModal.candidateDetails.bio) && (
+                  <div>
+                    <h4 className="text-sm font-extrabold text-white mb-1.5">
+                      Profile Summary
+                    </h4>
+                    {activeMessageModal.candidateDetails.headline && (
+                      <p className="font-bold text-slate-200 mb-1">
+                        {activeMessageModal.candidateDetails.headline}
+                      </p>
+                    )}
+                    {activeMessageModal.candidateDetails.bio && (
+                      <p className="text-slate-300 leading-relaxed whitespace-pre-line">
+                        {activeMessageModal.candidateDetails.bio}
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {activeMessageModal.candidateDetails.skills.length > 0 && (
+                  <div>
+                    <h4 className="text-sm font-extrabold text-white mb-2">
+                      Key Skills
+                    </h4>
+                    <div className="flex flex-wrap gap-2">
+                      {activeMessageModal.candidateDetails.skills.map(
+                        (s, idx) => (
+                          <span
+                            key={idx}
+                            className="px-3.5 py-1.5 rounded-full bg-slate-800 border border-slate-700 text-xs font-semibold text-slate-200"
+                          >
+                            {s}
+                          </span>
+                        )
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {activeMessageModal.candidateDetails.employmentList.length >
+                  0 && (
+                  <div>
+                    <h4 className="text-sm font-extrabold text-white mb-2.5">
+                      Work Experience
+                    </h4>
+                    <div className="space-y-3">
+                      {activeMessageModal.candidateDetails.employmentList.map(
+                        (emp: any, idx: number) => (
+                          <div
+                            key={emp?.id || idx}
+                            className="bg-slate-950/60 border border-slate-800 rounded-2xl p-4"
+                          >
+                            <p className="text-sm font-extrabold text-white">
+                              {emp?.designation || 'Role'}
+                            </p>
+                            <p className="text-xs font-bold text-slate-300 mt-0.5">
+                              {emp?.company}
+                            </p>
+                            <p className="text-[11px] text-slate-400 mt-0.5">
+                              {emp?.employmentType || 'Full-time'}
+                              {emp?.startDate
+                                ? ` | ${emp.startDate} to ${
+                                    emp.endDate || 'Present'
+                                  }`
+                                : ''}
+                            </p>
+                            {emp?.description && (
+                              <p className="text-xs text-slate-300 mt-2 leading-relaxed whitespace-pre-line">
+                                {emp.description}
+                              </p>
+                            )}
+                          </div>
+                        )
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {activeMessageModal.candidateDetails.educationList.length >
+                  0 && (
+                  <div>
+                    <h4 className="text-sm font-extrabold text-white mb-2.5">
+                      Education
+                    </h4>
+                    <div className="space-y-2.5">
+                      {activeMessageModal.candidateDetails.educationList.map(
+                        (edu: any, idx: number) => (
+                          <div
+                            key={edu?.id || idx}
+                            className="bg-slate-950/60 border border-slate-800 rounded-2xl p-3.5"
+                          >
+                            <p className="text-xs font-extrabold text-white">
+                              {edu?.degree ||
+                                `${edu?.course || ''} ${
+                                  edu?.specialization || ''
+                                }`}
+                            </p>
+                            <p className="text-xs text-slate-300 mt-0.5">
+                              {edu?.institute}
+                            </p>
+                            <p className="text-[11px] text-slate-400 mt-0.5">
+                              {edu?.yearRange}
+                              {edu?.courseType ? ` | ${edu.courseType}` : ''}
+                            </p>
+                          </div>
+                        )
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Direct Reply / Interview Invitation Box */}
+                <form
+                  onSubmit={handleSendDirectReplyToCandidate}
+                  className="pt-4 border-t border-slate-800 space-y-3"
+                >
+                  <label className="block text-xs font-extrabold text-white">
+                    Send Direct Interview Invite / Message to{' '}
+                    {activeMessageModal.candidateDetails.name}
+                  </label>
+                  <div className="flex flex-col sm:flex-row gap-2.5">
+                    <input
+                      type="text"
+                      value={replyText}
+                      onChange={(e) => setReplyText(e.target.value)}
+                      placeholder="Write interview schedule or next steps..."
+                      className="flex-1 bg-slate-950 border border-slate-700 rounded-2xl px-4 py-2.5 text-xs text-white placeholder:text-slate-500 outline-none focus:border-indigo-500"
+                    />
+                    <button
+                      type="submit"
+                      disabled={sendingReply || !replyText.trim()}
+                      className="px-6 py-2.5 rounded-2xl bg-indigo-600 hover:bg-indigo-500 disabled:bg-indigo-600/50 text-xs font-extrabold text-white transition cursor-pointer shrink-0"
+                    >
+                      {sendingReply ? 'Sending...' : 'Send Message'}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          ) : (
+            /* CANDIDATE MESSAGE READER MODAL (Masked Contact Details) */
+            <div
+              className="group bg-slate-900 border border-slate-700 rounded-3xl max-w-lg w-full p-7 shadow-2xl relative"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <button
+                type="button"
+                onClick={() => setActiveMessageModal(null)}
+                className="opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto absolute top-6 right-6 w-9 h-9 rounded-full bg-slate-800 border border-slate-700 text-slate-400 hover:text-white flex items-center justify-center cursor-pointer transition-all"
+              >
+                ✕
+              </button>
+
+              <div className="flex items-center gap-3.5 pb-4 border-b border-slate-800 pr-10">
+                <div className="w-11 h-11 rounded-full bg-indigo-600/20 border border-indigo-500/40 text-indigo-300 font-extrabold text-sm flex items-center justify-center shrink-0">
+                  {activeMessageModal.senderName?.charAt(0)?.toUpperCase() ||
+                    'R'}
+                </div>
+                <div className="min-w-0">
+                  <h3 className="text-base font-extrabold text-white truncate">
+                    {activeMessageModal.senderName}
+                  </h3>
+                  <p className="text-xs text-slate-400 truncate">
+                    {activeMessageModal.senderCompany} •{' '}
+                    {maskMessageContentClient(activeMessageModal.senderEmail)}
+                  </p>
+                </div>
+              </div>
+
+              <div className="py-5">
+                <p className="text-xs font-bold text-slate-400 mb-2">
+                  {maskMessageContentClient(activeMessageModal.subject)}
+                </p>
+                <div className="bg-slate-950/90 border border-slate-800 rounded-2xl p-4 text-sm text-slate-100 leading-relaxed whitespace-pre-line">
+                  {maskMessageContentClient(activeMessageModal.body)}
+                </div>
+                <p className="text-[11px] text-amber-400/90 mt-3">
+                  🔒 Phone numbers and email addresses in messages are masked
+                  for privacy.
+                </p>
+              </div>
+
+              <div className="flex justify-end gap-3 pt-3 border-t border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setActiveMessageModal(null)}
+                  className="px-5 py-2 rounded-full bg-slate-800 hover:bg-slate-700 text-xs font-bold text-slate-200 transition cursor-pointer"
+                >
+                  Close
+                </button>
+                <Link
+                  href="/credits"
+                  onClick={() => setActiveMessageModal(null)}
+                  className="px-5 py-2 rounded-full bg-blue-600 hover:bg-blue-500 text-xs font-extrabold text-white transition"
+                >
+                  Upgrade to Unlock Contact
+                </Link>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* =====================================================================
           FULL-LENGTH PROFILE DRAWER
@@ -683,6 +1477,34 @@ export default function Header({ accentColor, isGlobal = false }: HeaderProps) {
                         />
                       </svg>
                       <span>Company Profile</span>
+                    </Link>
+
+                    <Link
+                      href="/employer/jobs"
+                      onClick={() => setShowProfileDrawer(false)}
+                      className="flex items-center justify-between px-4 py-3 rounded-xl text-sm font-semibold text-slate-200 hover:bg-slate-800 hover:text-white transition-colors"
+                    >
+                      <div className="flex items-center gap-3.5">
+                        <svg
+                          className="w-5 h-5 text-slate-400"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth="1.8"
+                            d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                          />
+                        </svg>
+                        <span>Manage Jobs &amp; Responses</span>
+                      </div>
+                      {unreadCount > 0 && (
+                        <span className="px-2 py-0.5 rounded-full bg-red-600 text-white text-[10px] font-extrabold">
+                          {unreadCount}
+                        </span>
+                      )}
                     </Link>
 
                     <Link
@@ -971,6 +1793,18 @@ export default function Header({ accentColor, isGlobal = false }: HeaderProps) {
 
                   {/* MENU LINKS */}
                   <div className="mx-6 space-y-2 mb-6">
+                    <Link
+                      href="/messages"
+                      onClick={() => setShowProfileDrawer(false)}
+                      className="flex items-center justify-between px-4 py-3 rounded-xl bg-slate-800/40 hover:bg-slate-800 border border-slate-700/50 text-slate-200 font-bold text-sm transition-colors"
+                    >
+                      <span>Messages &amp; NVites</span>
+                      {unreadCount > 0 && (
+                        <span className="px-2 py-0.5 rounded-full bg-red-600 text-white text-[10px] font-extrabold">
+                          {unreadCount}
+                        </span>
+                      )}
+                    </Link>
                     <Link
                       href="/about"
                       onClick={() => setShowProfileDrawer(false)}
