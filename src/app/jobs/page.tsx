@@ -236,7 +236,7 @@ export default function JobsDirectoryPage() {
 
             {loading ? (
               <div className="bg-slate-900/60 border border-slate-800 rounded-3xl p-16 text-center text-sm text-slate-400">
-                Loading active jobs from Neon database...
+                Loading active jobs...
               </div>
             ) : filteredJobs.length === 0 ? (
               <div className="bg-slate-900/60 border border-slate-800 rounded-3xl py-16 px-6 text-center shadow-xl">

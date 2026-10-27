@@ -1,5 +1,12 @@
 import { NextResponse } from 'next/server';
-import { sql, escapeSqlLike } from '../../../../utils/db';
+import { cookies } from 'next/headers';
+import {
+  sql,
+  escapeSqlLike,
+  maskEmailServer,
+  maskPhoneServer,
+  verifySessionToken,
+} from '../../../../utils/db';
 
 export const dynamic = 'force-dynamic';
 
@@ -22,6 +29,23 @@ export async function GET(request: Request) {
       searchParams.get('skill') ||
       '';
     const escapedSearch = escapeSqlLike(rawSearch);
+
+    // Check if the requesting employer has an ACTIVE paid plan in subscriptions
+    let hasActiveSubscription = false;
+    try {
+      const cookieStore = await cookies();
+      const sessionCookie = cookieStore.get('rm_session')?.value;
+      const session = verifySessionToken(sessionCookie);
+      if (session?.id) {
+        const subRows = await sql`
+          SELECT id FROM subscriptions
+          WHERE user_id = ${session.id}
+            AND UPPER(TRIM(COALESCE(status, ''))) = 'ACTIVE'
+          LIMIT 1
+        `;
+        hasActiveSubscription = subRows.length > 0;
+      }
+    } catch {}
 
     const rows = escapedSearch
       ? await sql`
@@ -68,14 +92,15 @@ export async function GET(request: Request) {
         }
       }
 
-      // Normalize skills array to plain strings
       let skillsList: string[] = [];
       if (row.skills) {
         try {
           const parsedSkills = JSON.parse(row.skills);
           if (Array.isArray(parsedSkills)) {
             skillsList = parsedSkills
-              .map((s) => toSafeText(typeof s === 'object' ? s?.skill || s?.name : s))
+              .map((s) =>
+                toSafeText(typeof s === 'object' ? s?.skill || s?.name : s)
+              )
               .filter(Boolean);
           } else {
             skillsList = String(row.skills)
@@ -91,7 +116,9 @@ export async function GET(request: Request) {
         }
       } else if (Array.isArray(parsedData.keySkills)) {
         skillsList = parsedData.keySkills
-          .map((s: any) => toSafeText(typeof s === 'object' ? s?.skill || s?.name : s))
+          .map((s: any) =>
+            toSafeText(typeof s === 'object' ? s?.skill || s?.name : s)
+          )
           .filter(Boolean);
       }
 
@@ -130,13 +157,15 @@ export async function GET(request: Request) {
         'experienced'
       ).toLowerCase();
 
-      const email = toSafeText(row.user_email || row.email);
-      const fallbackName = email ? email.split('@')[0] : 'Candidate';
+      const rawEmail = toSafeText(row.user_email || row.email);
+      const rawPhone = toSafeText(
+        row.phone || parsedData.phone,
+        'Not provided'
+      );
+      const fallbackName = rawEmail ? rawEmail.split('@')[0] : 'Candidate';
 
       const roleTitle = toSafeText(
-        row.role ||
-          parsedData.designation ||
-          firstEmployment?.designation,
+        row.role || parsedData.designation || firstEmployment?.designation,
         'Software Professional'
       );
 
@@ -154,12 +183,21 @@ export async function GET(request: Request) {
         ''
       );
 
+      // Server-side contact masking (#19) unless employer has an active subscription
+      const safeEmailOutput = hasActiveSubscription
+        ? rawEmail
+        : maskEmailServer(rawEmail);
+      const safePhoneOutput = hasActiveSubscription
+        ? rawPhone
+        : maskPhoneServer(rawPhone);
+
       return {
         id: Number(row.id || row.uid || 1),
         userId: Number(row.uid || row.user_id || 1),
         name: toSafeText(row.name || parsedData.name, fallbackName),
-        email,
-        phone: toSafeText(row.phone || parsedData.phone, 'Not provided'),
+        email: safeEmailOutput,
+        phone: safePhoneOutput,
+        isContactUnlocked: hasActiveSubscription,
         location: toSafeText(row.location || parsedData.location, 'India'),
         workStatus,
         work_status: workStatus,
@@ -212,7 +250,7 @@ export async function GET(request: Request) {
       };
     });
 
-    return NextResponse.json({ candidates });
+    return NextResponse.json({ candidates, hasActiveSubscription });
   } catch (error: any) {
     console.error('GET /api/employer/talent error:', error);
     return NextResponse.json(

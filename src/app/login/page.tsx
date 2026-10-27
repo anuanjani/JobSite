@@ -30,6 +30,9 @@ export default function LoginPage() {
 
       if (response.ok && data.user) {
         localStorage.setItem('user', JSON.stringify(data.user));
+        window.dispatchEvent(
+          new CustomEvent('profile-updated', { detail: data.user })
+        );
         setStatus('success');
 
         if (String(data.user.role).toUpperCase() === 'EMPLOYER') {
@@ -70,7 +73,7 @@ export default function LoginPage() {
         </Link>
 
         {/* Left Panel */}
-        <div className="w-full md:w-5/12 bg-slate-900/50 p-10 lg:p-12 flex flex-col border-r border-slate-700/50 justify-between">
+        <div className="w-full md:w-5/12 bg-slate-900/50 p-10 lg:p-12 flex flex-col border-r border-slate-700/50 justify-center">
           <div>
             <div className="inline-block px-3.5 py-1 rounded-full bg-slate-800 border border-slate-700 text-[10px] font-extrabold uppercase tracking-widest text-pink-400 mb-6">
               Welcome Back
@@ -79,20 +82,10 @@ export default function LoginPage() {
               Powering your{' '}
               <span className="text-pink-400">next move.</span>
             </h2>
-            <p className="text-sm text-slate-400 leading-relaxed mb-8">
+            <p className="text-sm text-slate-400 leading-relaxed">
               Sign in to access your personalized dashboard, track job
               applications, or manage your enterprise talent pipeline.
             </p>
-          </div>
-
-          <div className="pt-6 border-t border-slate-800/80 text-xs text-slate-400">
-            Hiring for your company?{' '}
-            <Link
-              href="/employer/register"
-              className="text-indigo-400 font-bold hover:underline"
-            >
-              Create an Employer Account &rarr;
-            </Link>
           </div>
         </div>
 
@@ -122,12 +115,12 @@ export default function LoginPage() {
               />
             </div>
 
-            {/* Password with Eye Show/Hide Toggle */}
+            {/* Password with Vertically Centered Eye Show/Hide Toggle */}
             <div>
               <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">
                 Password *
               </label>
-              <div className="relative">
+              <div className="relative flex items-center">
                 <input
                   type={showPassword ? 'text' : 'password'}
                   required
@@ -144,7 +137,8 @@ export default function LoginPage() {
                   tabIndex={-1}
                   onClick={() => setShowPassword(!showPassword)}
                   title={showPassword ? 'Hide password' : 'Show password'}
-                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white transition-colors p-1 cursor-pointer"
+                  style={{ top: '50%', transform: 'translateY(-50%)' }}
+                  className="absolute right-3.5 flex items-center justify-center text-slate-400 hover:text-white transition-colors p-1 cursor-pointer"
                 >
                   {showPassword ? (
                     <svg
@@ -237,26 +231,24 @@ export default function LoginPage() {
             </button>
           </form>
 
-          {/* Bottom Registration Links (Candidate + Employer Registration) */}
-          <div className="mt-8 pt-6 border-t border-slate-800/70 text-center space-y-2.5">
-            <p className="text-xs font-medium text-slate-400">
-              Don&apos;t have an account?{' '}
+          {/* Bottom Registration Links (Adjacent: Register as Candidate | Register as Employer) */}
+          <div className="mt-8 pt-6 border-t border-slate-800/70 flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-4 text-xs font-medium text-slate-400">
+            <span>Don&apos;t have an account?</span>
+            <div className="flex items-center gap-3">
               <Link
                 href="/register"
-                className="text-white font-bold hover:underline"
+                className="text-white font-bold hover:text-pink-400 hover:underline transition-colors"
               >
                 Register as Candidate
               </Link>
-            </p>
-            <p className="text-xs font-medium text-slate-400">
-              Looking to hire talent?{' '}
+              <span className="text-slate-600">|</span>
               <Link
                 href="/employer/register"
-                className="text-indigo-400 font-bold hover:underline"
+                className="text-indigo-400 font-bold hover:text-indigo-300 hover:underline transition-colors"
               >
-                Employer Registration &rarr;
+                Register as Employer
               </Link>
-            </p>
+            </div>
           </div>
         </div>
       </div>

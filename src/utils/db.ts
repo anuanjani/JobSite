@@ -1,4 +1,5 @@
 import { neon } from '@neondatabase/serverless';
+import crypto from 'crypto';
 
 if (!process.env.DATABASE_URL) {
   throw new Error('DATABASE_URL environment variable is not set.');
@@ -8,6 +9,11 @@ if (!process.env.DATABASE_URL) {
  * Parameterized Neon SQL client.
  */
 export const sql = neon(process.env.DATABASE_URL);
+
+const SESSION_SECRET =
+  process.env.JWT_SECRET ||
+  process.env.UPLOADTHING_SECRET ||
+  'rolematch-enterprise-hmac-secret-key-2026';
 
 /**
  * Cleans a string, strips null bytes/control characters, and neutralizes
@@ -96,6 +102,213 @@ export function escapeSqlLike(input: unknown): string {
 }
 
 /**
+ * Validates an outbound URL to prevent SSRF by blocking private, loopback,
+ * and link-local IP ranges.
+ */
+export function isSafeOutboundUrl(rawUrl: string): boolean {
+  try {
+    const parsed = new URL(rawUrl);
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+      return false;
+    }
+
+    const hostname = parsed.hostname.toLowerCase();
+
+    if (
+      hostname === 'localhost' ||
+      hostname === '127.0.0.1' ||
+      hostname === '::1' ||
+      hostname === '0.0.0.0'
+    ) {
+      return false;
+    }
+
+    if (
+      hostname.startsWith('10.') ||
+      hostname.startsWith('192.168.') ||
+      hostname.startsWith('169.254.') ||
+      /^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(hostname)
+    ) {
+      return false;
+    }
+
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * #8 Password Security: Cryptographic scrypt password hashing with random 16-byte salt.
+ */
+export function hashPassword(plainPassword: string): string {
+  const salt = crypto.randomBytes(16).toString('hex');
+  const derivedKey = crypto
+    .scryptSync(plainPassword, salt, 64)
+    .toString('hex');
+  return `scrypt$${salt}$${derivedKey}`;
+}
+
+/**
+ * #8 Password Security: Verifies scrypt hash or legacy plaintext password.
+ * Returns { valid, needsRehash } so legacy accounts auto-upgrade seamlessly.
+ */
+export function verifyPassword(
+  plainPassword: string,
+  storedPassword: string
+): { valid: boolean; needsRehash: boolean } {
+  if (!plainPassword || !storedPassword) {
+    return { valid: false, needsRehash: false };
+  }
+
+  if (storedPassword.startsWith('scrypt$')) {
+    const parts = storedPassword.split('$');
+    if (parts.length !== 3) return { valid: false, needsRehash: false };
+    const [, salt, originalHash] = parts;
+    try {
+      const derivedBuf = crypto.scryptSync(plainPassword, salt, 64);
+      const originalBuf = Buffer.from(originalHash, 'hex');
+      if (derivedBuf.length !== originalBuf.length) {
+        return { valid: false, needsRehash: false };
+      }
+      const match = crypto.timingSafeEqual(derivedBuf, originalBuf);
+      return { valid: match, needsRehash: false };
+    } catch {
+      return { valid: false, needsRehash: false };
+    }
+  }
+
+  // Fallback for pre-existing plaintext rows in Neon DB -> auto-rehash on match
+  const isMatch = plainPassword === storedPassword;
+  return { valid: isMatch, needsRehash: isMatch };
+}
+
+/**
+ * #12 & #14: Creates an HMAC-SHA256 signed session token for HttpOnly cookies.
+ */
+export function createSessionToken(payload: {
+  id: number;
+  email: string;
+  role: string;
+}): string {
+  const data = {
+    id: payload.id,
+    email: payload.email.toLowerCase(),
+    role: payload.role.toUpperCase(),
+    exp: Date.now() + 7 * 24 * 60 * 60 * 1000, // 7 days
+  };
+  const encoded = Buffer.from(JSON.stringify(data)).toString('base64url');
+  const signature = crypto
+    .createHmac('sha256', SESSION_SECRET)
+    .update(encoded)
+    .digest('base64url');
+  return `${encoded}.${signature}`;
+}
+
+/**
+ * Verifies an HMAC-SHA256 session token from cookies.
+ */
+export function verifySessionToken(token?: string | null): {
+  id: number;
+  email: string;
+  role: string;
+} | null {
+  if (!token || !token.includes('.')) return null;
+  const [encoded, signature] = token.split('.');
+  if (!encoded || !signature) return null;
+
+  try {
+    const expectedSig = crypto
+      .createHmac('sha256', SESSION_SECRET)
+      .update(encoded)
+      .digest('base64url');
+    if (signature !== expectedSig) return null;
+
+    const parsed = JSON.parse(
+      Buffer.from(encoded, 'base64url').toString('utf8')
+    );
+    if (!parsed || typeof parsed.exp !== 'number' || Date.now() > parsed.exp) {
+      return null;
+    }
+    return {
+      id: Number(parsed.id),
+      email: String(parsed.email),
+      role: String(parsed.role),
+    };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * #19 Sensitive Data: Server-side email masking (an***j***@live.in).
+ */
+export function maskEmailServer(rawEmail: unknown): string {
+  const email = safeString(rawEmail, 254);
+  if (!email || !email.includes('@')) return 'Not provided';
+  const [localPart, domain] = email.split('@');
+  if (!localPart || !domain) return 'Not provided';
+
+  if (localPart.length >= 6) {
+    const firstTwo = localPart.slice(0, 2);
+    const midChar = localPart[Math.ceil(localPart.length / 2)];
+    return `${firstTwo}***${midChar}***@${domain}`;
+  }
+  if (localPart.length > 2) {
+    return `${localPart.slice(0, 2)}***@${domain}`;
+  }
+  return `${localPart.charAt(0)}***@${domain}`;
+}
+
+/**
+ * #19 Sensitive Data: Server-side phone masking (+91-******1873).
+ */
+export function maskPhoneServer(rawPhone: unknown): string {
+  const phone = safeString(rawPhone, 50);
+  const digits = phone.replace(/\D/g, '');
+  if (digits.length < 4) return '+91-**********';
+  return `+91-******${digits.slice(-4)}`;
+}
+
+/**
+ * Enterprise Immutable Security Audit Logger.
+ */
+export async function logAuditEvent(params: {
+  actorEmail: string;
+  actorRole?: string;
+  action: string;
+  target?: string;
+  details?: string;
+}) {
+  try {
+    await sql`
+      CREATE TABLE IF NOT EXISTS audit_logs (
+        id SERIAL PRIMARY KEY,
+        actor_email VARCHAR(255),
+        actor_role VARCHAR(50),
+        action VARCHAR(100) NOT NULL,
+        target VARCHAR(255),
+        details TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `;
+
+    await sql`
+      INSERT INTO audit_logs (actor_email, actor_role, action, target, details)
+      VALUES (
+        ${safeString(params.actorEmail, 254)},
+        ${safeString(params.actorRole || 'USER', 50)},
+        ${safeString(params.action, 100)},
+        ${safeString(params.target || '', 254)},
+        ${safeString(params.details || '', 1000)}
+      )
+    `;
+  } catch (err) {
+    console.error('Audit log error:', err);
+  }
+}
+
+/**
  * Inspects binary magic bytes to detect the true file format and block spoofed extensions.
  */
 function detectFileSignature(
@@ -103,7 +316,6 @@ function detectFileSignature(
 ): { mime: string; ext: string } | null {
   if (buf.length < 4) return null;
 
-  // 1. PNG: 89 50 4E 47 0D 0A 1A 0A
   if (
     buf.length >= 8 &&
     buf[0] === 0x89 &&
@@ -118,12 +330,10 @@ function detectFileSignature(
     return { mime: 'image/png', ext: '.png' };
   }
 
-  // 2. JPEG: FF D8 FF
   if (buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) {
     return { mime: 'image/jpeg', ext: '.jpg' };
   }
 
-  // 3. GIF: "GIF87a" or "GIF89a"
   if (
     buf.length >= 6 &&
     buf[0] === 0x47 &&
@@ -136,7 +346,6 @@ function detectFileSignature(
     return { mime: 'image/gif', ext: '.gif' };
   }
 
-  // 4. WEBP: "RIFF" + 4 bytes + "WEBP"
   if (
     buf.length >= 12 &&
     buf[0] === 0x52 &&
@@ -151,7 +360,6 @@ function detectFileSignature(
     return { mime: 'image/webp', ext: '.webp' };
   }
 
-  // 5. PDF: "%PDF-" (25 50 44 46 2D)
   if (
     buf.length >= 5 &&
     buf[0] === 0x25 &&
@@ -163,7 +371,6 @@ function detectFileSignature(
     return { mime: 'application/pdf', ext: '.pdf' };
   }
 
-  // 6. DOC (OLE2 Compound Document): D0 CF 11 E0 A1 B1 1A E1
   if (
     buf.length >= 8 &&
     buf[0] === 0xd0 &&
@@ -178,7 +385,6 @@ function detectFileSignature(
     return { mime: 'application/msword', ext: '.doc' };
   }
 
-  // 7. DOCX (PK ZIP archive): 50 4B 03 04
   if (
     buf[0] === 0x50 &&
     buf[1] === 0x4b &&
@@ -191,7 +397,6 @@ function detectFileSignature(
     };
   }
 
-  // 8. RTF: "{\rtf" (7B 5C 72 74 66)
   if (
     buf.length >= 5 &&
     buf[0] === 0x7b &&
@@ -208,7 +413,7 @@ function detectFileSignature(
 
 /**
  * Validates Base64 file uploads by checking size limits, verifying binary magic bytes,
- * and sanitizing the filename to prevent path traversal and double-extension attacks.
+ * and sanitizing the filename.
  */
 export function validateAndDecodeBase64File(
   base64DataUri: unknown,
@@ -226,7 +431,6 @@ export function validateAndDecodeBase64File(
   }
 
   const maxBytes = category === 'kyc' ? 4 * 1024 * 1024 : 2 * 1024 * 1024;
-  // Reject oversized Base64 strings before allocating Buffer memory
   if (base64DataUri.length > Math.ceil(maxBytes * 1.37) + 256) {
     return {
       valid: false,
@@ -236,7 +440,9 @@ export function validateAndDecodeBase64File(
     };
   }
 
-  const matches = base64DataUri.match(/^data:([^;]+);base64,([a-zA-Z0-9+/=\s]+)$/);
+  const matches = base64DataUri.match(
+    /^data:([^;]+);base64,([a-zA-Z0-9+/=\s]+)$/
+  );
   if (!matches) {
     return { valid: false, error: 'Malformed Base64 file payload.' };
   }
@@ -297,14 +503,14 @@ export function validateAndDecodeBase64File(
     };
   }
 
-  // Sanitize filename: strip directory paths, extensions, and special characters
   const rawName = typeof rawFileName === 'string' ? rawFileName : category;
-  const baseName = rawName
-    .split(/[\\/]/)
-    .pop()!
-    .replace(/\.[^.]+$/, '')
-    .replace(/[^a-zA-Z0-9_-]/g, '_')
-    .slice(0, 60) || category;
+  const baseName =
+    rawName
+      .split(/[\\/]/)
+      .pop()!
+      .replace(/\.[^.]+$/, '')
+      .replace(/[^a-zA-Z0-9_-]/g, '_')
+      .slice(0, 60) || category;
 
   const safeFileName = `${baseName}_${Date.now()}${signature.ext}`;
 

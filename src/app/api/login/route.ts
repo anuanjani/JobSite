@@ -1,5 +1,12 @@
 import { NextResponse } from 'next/server';
-import { sql, safeString } from '../../../utils/db';
+import {
+  sql,
+  safeString,
+  verifyPassword,
+  hashPassword,
+  createSessionToken,
+  logAuditEvent,
+} from '../../../utils/db';
 
 export async function POST(request: Request) {
   try {
@@ -22,6 +29,11 @@ export async function POST(request: Request) {
     `;
 
     if (users.length === 0) {
+      await logAuditEvent({
+        actorEmail: email,
+        action: 'LOGIN_FAILED',
+        details: 'Account not found',
+      });
       return NextResponse.json(
         { error: 'Invalid email or password.' },
         { status: 401 }
@@ -29,13 +41,39 @@ export async function POST(request: Request) {
     }
 
     const user = users[0];
-    const storedPassword = user.password_hash ?? user.password ?? '';
+    const storedPassword = String(user.password_hash ?? user.password ?? '');
 
-    if (String(storedPassword) !== password) {
+    const { valid, needsRehash } = verifyPassword(password, storedPassword);
+
+    if (!valid) {
+      await logAuditEvent({
+        actorEmail: email,
+        actorRole: String(user.role || 'CANDIDATE'),
+        action: 'LOGIN_FAILED',
+        details: 'Invalid password',
+      });
       return NextResponse.json(
         { error: 'Invalid email or password.' },
         { status: 401 }
       );
+    }
+
+    // Automatically upgrade legacy plaintext password to scrypt hash in Neon DB
+    if (needsRehash) {
+      try {
+        const upgradedHash = hashPassword(password);
+        await sql`
+          UPDATE users
+          SET password_hash = ${upgradedHash}
+          WHERE id = ${user.id}
+        `;
+        await logAuditEvent({
+          actorEmail: email,
+          actorRole: String(user.role || 'CANDIDATE'),
+          action: 'PASSWORD_HASH_UPGRADED',
+          details: 'Legacy password automatically migrated to scrypt hash',
+        });
+      } catch {}
     }
 
     const role = String(user.role || 'CANDIDATE').toUpperCase();
@@ -75,6 +113,13 @@ export async function POST(request: Request) {
       } catch {}
     }
 
+    await logAuditEvent({
+      actorEmail: user.email,
+      actorRole: role,
+      action: 'LOGIN_SUCCESS',
+      details: `Authenticated as ${role}`,
+    });
+
     const userPayload = {
       id: user.id,
       email: user.email,
@@ -85,11 +130,27 @@ export async function POST(request: Request) {
       avatar,
     };
 
-    return NextResponse.json({
+    const token = createSessionToken({
+      id: Number(user.id),
+      email: String(user.email),
+      role,
+    });
+
+    const response = NextResponse.json({
       success: true,
       ...userPayload,
       user: userPayload,
     });
+
+    response.cookies.set('rm_session', token, {
+      httpOnly: true,
+      sameSite: 'lax',
+      secure: process.env.NODE_ENV === 'production',
+      path: '/',
+      maxAge: 7 * 24 * 60 * 60,
+    });
+
+    return response;
   } catch (error: any) {
     console.error('POST /api/login error:', error);
     return NextResponse.json(

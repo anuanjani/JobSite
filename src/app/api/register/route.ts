@@ -1,31 +1,19 @@
 import { NextResponse } from 'next/server';
-import { neon } from '@neondatabase/serverless';
+import {
+  sql,
+  safeString,
+  hashPassword,
+  createSessionToken,
+  logAuditEvent,
+} from '../../../utils/db';
 
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const {
-      name,
-      fullName,
-      email,
-      password,
-      role,
-      mobileNumber,
-      mobile,
-      phone,
-      workStatus,
-      hiringFor,
-      companyName,
-      industry,
-      industryType,
-      employees,
-      employeeCount,
-      designation,
-      pincode,
-      address,
-      city,
-      state,
-    } = body;
+    const email = safeString(body?.email, 254).toLowerCase();
+    const password = safeString(body?.password, 256);
+    const role = safeString(body?.role || 'CANDIDATE', 30).toUpperCase();
+    const phone = safeString(body?.phone || body?.mobile, 30);
 
     if (!email || !password) {
       return NextResponse.json(
@@ -34,148 +22,139 @@ export async function POST(request: Request) {
       );
     }
 
-    const sql = neon(process.env.DATABASE_URL!);
-    const cleanEmail = String(email).trim().toLowerCase();
-    const resolvedName = String(name || fullName || '').trim();
-    const resolvedPhone = String(mobileNumber || mobile || phone || '')
-      .replace(/\D/g, '')
-      .slice(-10);
-    const userRole =
-      String(role || 'CANDIDATE').toUpperCase() === 'EMPLOYER'
-        ? 'EMPLOYER'
-        : 'CANDIDATE';
-
-    // 1. Check if email already exists in `users`
-    const existingUsers = await sql`
-      SELECT id FROM users WHERE LOWER(TRIM(email)) = ${cleanEmail} LIMIT 1
+    const existing = await sql`
+      SELECT id FROM users WHERE LOWER(TRIM(email)) = ${email} LIMIT 1
     `;
-    if (existingUsers.length > 0) {
+    if (existing.length > 0) {
       return NextResponse.json(
-        { error: 'Account already exists with this email.' },
+        { error: 'This Email ID is already registered. Please sign in.' },
         { status: 409 }
       );
     }
 
-    // 2. Detect exact password column name in `users` table (`password` vs `password_hash`)
-    const userColumns = await sql`
-      SELECT column_name
-      FROM information_schema.columns
-      WHERE table_schema = 'public' AND table_name = 'users'
+    const passwordHash = hashPassword(password);
+
+    const insertedUser = await sql`
+      INSERT INTO users (email, password_hash, role)
+      VALUES (${email}, ${passwordHash}, ${role})
+      RETURNING id, email, role
     `;
-    const colSet = new Set(userColumns.map((c: any) => c.column_name));
+    const user = insertedUser[0];
 
-    let newUsers;
-    if (colSet.has('password_hash') && colSet.has('password')) {
-      newUsers = await sql`
-        INSERT INTO users (email, password, password_hash, role)
-        VALUES (${cleanEmail}, ${password}, ${password}, ${userRole})
-        RETURNING id, email, role
-      `;
-    } else if (colSet.has('password_hash')) {
-      newUsers = await sql`
-        INSERT INTO users (email, password_hash, role)
-        VALUES (${cleanEmail}, ${password}, ${userRole})
-        RETURNING id, email, role
-      `;
-    } else {
-      newUsers = await sql`
-        INSERT INTO users (email, password, role)
-        VALUES (${cleanEmail}, ${password}, ${userRole})
-        RETURNING id, email, role
-      `;
-    }
+    let displayName = '';
 
-    const userId = newUsers[0].id;
+    if (role === 'EMPLOYER') {
+      const fullName = safeString(
+        body?.fullName || body?.name || body?.companyName,
+        255
+      );
+      const companyName = safeString(
+        body?.companyName || body?.fullName || 'Company',
+        255
+      );
+      displayName = fullName || companyName;
 
-    // 3. Create corresponding profile row in `employer_profiles` or `candidate_profiles`
-    if (userRole === 'EMPLOYER') {
       await sql`
-        ALTER TABLE employer_profiles
-          ADD COLUMN IF NOT EXISTS full_name TEXT,
-          ADD COLUMN IF NOT EXISTS phone TEXT,
-          ADD COLUMN IF NOT EXISTS hiring_for TEXT DEFAULT 'company',
-          ADD COLUMN IF NOT EXISTS company_name TEXT,
-          ADD COLUMN IF NOT EXISTS industry_type TEXT DEFAULT 'Software Services',
-          ADD COLUMN IF NOT EXISTS employee_count TEXT,
-          ADD COLUMN IF NOT EXISTS designation TEXT,
-          ADD COLUMN IF NOT EXISTS pincode TEXT,
-          ADD COLUMN IF NOT EXISTS address TEXT,
-          ADD COLUMN IF NOT EXISTS city TEXT,
-          ADD COLUMN IF NOT EXISTS state TEXT,
-          ADD COLUMN IF NOT EXISTS kyc_status TEXT DEFAULT 'PENDING'
+        CREATE TABLE IF NOT EXISTS employer_profiles (
+          id SERIAL PRIMARY KEY,
+          user_id INTEGER UNIQUE,
+          full_name VARCHAR(255),
+          company_name VARCHAR(255),
+          phone VARCHAR(50),
+          hiring_for VARCHAR(100),
+          industry_type VARCHAR(150),
+          employee_count VARCHAR(100),
+          designation VARCHAR(150),
+          pincode VARCHAR(20),
+          city VARCHAR(100),
+          state VARCHAR(100),
+          address TEXT,
+          kyc_status VARCHAR(50) DEFAULT 'PENDING',
+          kyc_doc_url TEXT,
+          avatar TEXT
+        )
       `;
 
       await sql`
         INSERT INTO employer_profiles (
-          user_id,
-          full_name,
-          phone,
-          hiring_for,
-          company_name,
-          industry_type,
-          employee_count,
-          designation,
-          pincode,
-          address,
-          city,
-          state,
-          kyc_status
+          user_id, full_name, company_name, phone, hiring_for,
+          industry_type, employee_count, designation, pincode, city, state, address, kyc_status
         ) VALUES (
-          ${userId},
-          ${resolvedName},
-          ${resolvedPhone},
-          ${hiringFor || 'company'},
-          ${companyName || resolvedName},
-          ${industry || industryType || 'Software Services'},
-          ${employees || employeeCount || ''},
-          ${designation || ''},
-          ${pincode || ''},
-          ${address || ''},
-          ${city || ''},
-          ${state || ''},
+          ${user.id},
+          ${fullName},
+          ${companyName},
+          ${phone},
+          ${safeString(body?.hiringFor || body?.accountType, 100)},
+          ${safeString(body?.industryType, 150)},
+          ${safeString(body?.employeeCount, 100)},
+          ${safeString(body?.designation, 150)},
+          ${safeString(body?.pincode, 20)},
+          ${safeString(body?.city, 100)},
+          ${safeString(body?.state, 100)},
+          ${safeString(body?.address, 500)},
           'PENDING'
         )
       `;
     } else {
-      await sql`
-        ALTER TABLE candidate_profiles
-          ADD COLUMN IF NOT EXISTS name VARCHAR(255),
-          ADD COLUMN IF NOT EXISTS phone VARCHAR(50),
-          ADD COLUMN IF NOT EXISTS work_status VARCHAR(50) DEFAULT 'experienced'
-      `;
-
-      const resolvedWorkStatus =
-        String(workStatus || '').toLowerCase() === 'fresher'
-          ? 'fresher'
-          : 'experienced';
+      const name = safeString(
+        body?.name || body?.fullName || email.split('@')[0],
+        255
+      );
+      displayName = name;
 
       await sql`
         INSERT INTO candidate_profiles (
-          user_id,
-          name,
-          phone,
-          work_status
+          user_id, name, phone, location, work_status, updated_at
         ) VALUES (
-          ${userId},
-          ${resolvedName},
-          ${resolvedPhone},
-          ${resolvedWorkStatus}
+          ${user.id},
+          ${name},
+          ${phone},
+          ${safeString(body?.location, 255)},
+          ${safeString(body?.workStatus || 'experienced', 50)},
+          ${new Date().toISOString()}
         )
       `;
     }
 
-    return NextResponse.json(
+    await logAuditEvent({
+      actorEmail: email,
+      actorRole: role,
+      action: 'USER_REGISTERED',
+      details: `New ${role} account registered`,
+    });
+
+    const userPayload = {
+      id: user.id,
+      email: user.email,
+      role,
+      name: displayName,
+      phone,
+    };
+
+    const token = createSessionToken({
+      id: Number(user.id),
+      email: String(user.email),
+      role,
+    });
+
+    const response = NextResponse.json(
       {
-        message: 'Registration successful',
-        user: {
-          id: userId,
-          name: resolvedName,
-          email: cleanEmail,
-          role: userRole,
-        },
+        success: true,
+        ...userPayload,
+        user: userPayload,
       },
       { status: 201 }
     );
+
+    response.cookies.set('rm_session', token, {
+      httpOnly: true,
+      sameSite: 'lax',
+      secure: process.env.NODE_ENV === 'production',
+      path: '/',
+      maxAge: 7 * 24 * 60 * 60,
+    });
+
+    return response;
   } catch (error: any) {
     console.error('POST /api/register error:', error);
     return NextResponse.json(
