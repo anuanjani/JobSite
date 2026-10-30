@@ -1,0 +1,49 @@
+{
+  "rolematchPortal": {
+    "baseUrl": "http://localhost:3000",
+    "employerEmail": "lulakula@gmail.com",
+    "employerPassword": "Welcome@2025"
+  },
+  "schedule": {
+    "autoRun": true,
+    "runEveryHours": 12
+  },
+  "criteria": {
+    "postedWithinHours": 12,
+    "deleteOlderThanDays": 4,
+    "includeKeywords": [],
+    "excludeKeywords": [],
+    "allowedLocations": [
+      "India",
+      "UAE",
+      "United Arab Emirates",
+      "Saudi Arabia",
+      "Qatar",
+      "Kuwait",
+      "Oman",
+      "Singapore"
+    ],
+    "defaultExperience": "3 - 8 Yrs",
+    "defaultNoticePeriod": "30 Days",
+    "defaultWorkMode": "Hybrid",
+    "maxJobsPerCompany": 50
+  },
+  "companies": [
+    {
+      "companyName": "YASH Technologies",
+      "careerUrl": "https://careers.yash.com/search?q=&locationsearch="
+    },
+    {
+      "companyName": "Qualitykiosk Technologies",
+      "careerUrl": "https://qualitykiosk.com/careers/current-openings/"
+    },
+    {
+      "companyName": "Grab",
+      "careerUrl": "https://www.grab.careers/en/jobs/"
+    },
+    {
+      "companyName": "Avaya",
+      "careerUrl": "https://careers.avaya.com/search/?createNewAlert=false&q=&optionsFacetsDD_title=&optionsFacetsDD_location=&optionsFacetsDD_department="
+    }
+  ]
+}

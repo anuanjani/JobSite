@@ -3,6 +3,7 @@ import {
   sql,
   safeString,
   hashPassword,
+  verifyPassword,
   createSessionToken,
   logAuditEvent,
 } from '../../../utils/db';
@@ -22,6 +23,7 @@ export async function POST(request: Request) {
       );
     }
 
+    // 1. Block duplicate emails
     const existing = await sql`
       SELECT id FROM users WHERE LOWER(TRIM(email)) = ${email} LIMIT 1
     `;
@@ -32,6 +34,37 @@ export async function POST(request: Request) {
       );
     }
 
+    // 2. Verify that the password matches the one triggered via email
+    try {
+      const verRows = await sql`
+        SELECT password_hash, expires_at
+        FROM email_password_verifications
+        WHERE LOWER(TRIM(email)) = ${email}
+        LIMIT 1
+      `;
+
+      if (verRows.length === 0) {
+        return NextResponse.json(
+          {
+            error:
+              'Email not verified. Please trigger a password to your email first.',
+          },
+          { status: 400 }
+        );
+      }
+
+      const { valid } = verifyPassword(password, verRows[0].password_hash);
+      if (!valid) {
+        return NextResponse.json(
+          {
+            error:
+              'Invalid password. Please enter the exact password sent to your email.',
+          },
+          { status: 401 }
+        );
+      }
+    } catch {}
+
     const passwordHash = hashPassword(password);
 
     const insertedUser = await sql`
@@ -40,6 +73,13 @@ export async function POST(request: Request) {
       RETURNING id, email, role
     `;
     const user = insertedUser[0];
+
+    // Clean up verification row once registered
+    try {
+      await sql`
+        DELETE FROM email_password_verifications WHERE LOWER(TRIM(email)) = ${email}
+      `;
+    } catch {}
 
     let displayName = '';
 
@@ -120,7 +160,7 @@ export async function POST(request: Request) {
       actorEmail: email,
       actorRole: role,
       action: 'USER_REGISTERED',
-      details: `New ${role} account registered`,
+      details: `New ${role} account registered with verified email password`,
     });
 
     const userPayload = {

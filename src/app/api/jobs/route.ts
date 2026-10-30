@@ -57,6 +57,59 @@ async function ensureJobsColumns() {
   `;
 }
 
+/**
+ * 1. Automatically deletes jobs (and their associated applications/notifications)
+ *    that are 4 or more days old.
+ * 2. Auto-fixes any existing scraped jobs that were saved under 'lula kula'
+ *    so they display their true source company name (Grab, Avaya, YASH, Qualitykiosk).
+ */
+async function purgeOldJobs() {
+  try {
+    const oldJobs = await sql`
+      SELECT id FROM jobs
+      WHERE created_at <= NOW() - INTERVAL '4 days'
+         OR (
+           posted_date ~ '^\d{4}-\d{2}-\d{2}$'
+           AND posted_date::date <= (CURRENT_DATE - INTERVAL '4 days')
+         )
+    `;
+
+    for (const row of oldJobs) {
+      try {
+        await sql`DELETE FROM job_applications WHERE job_id = ${row.id}`;
+      } catch {}
+      try {
+        await sql`DELETE FROM saved_jobs WHERE job_id = ${row.id}`;
+      } catch {}
+      try {
+        await sql`DELETE FROM messages WHERE job_id = ${row.id}`;
+      } catch {}
+      await sql`DELETE FROM jobs WHERE id = ${row.id}`;
+    }
+
+    // Auto-heal existing scraped jobs where company_name was overwritten with 'lula kula'
+    await sql`
+      UPDATE jobs
+      SET company_name = CASE
+        WHEN description ILIKE '%grab.careers%' OR description ILIKE '%at Grab %' THEN 'Grab'
+        WHEN description ILIKE '%avaya.com%' OR description ILIKE '%About Avaya%' THEN 'Avaya'
+        WHEN description ILIKE '%yash.com%' OR description ILIKE '%YASH Technologies%' THEN 'YASH Technologies'
+        WHEN description ILIKE '%qualitykiosk.com%' OR description ILIKE '%Qualitykiosk%' THEN 'Qualitykiosk Technologies'
+        ELSE company_name
+      END
+      WHERE LOWER(TRIM(COALESCE(company_name, ''))) = 'lula kula'
+        AND (
+          description ILIKE '%Source URL:%'
+          OR description ILIKE '%Source Application URL:%'
+          OR description ILIKE '%avaya.com%'
+          OR description ILIKE '%grab.careers%'
+        )
+    `;
+  } catch (err) {
+    console.error('Auto-purge old jobs error:', err);
+  }
+}
+
 async function ensureJobApplicationsColumns() {
   await sql`
     CREATE TABLE IF NOT EXISTS job_applications (
@@ -158,6 +211,7 @@ export async function GET(request: Request) {
     const rawJobId = searchParams.get('id');
 
     await ensureJobsColumns();
+    await purgeOldJobs();
 
     if (rawJobId !== null) {
       const validJobId = safePositiveInt(rawJobId);
@@ -313,7 +367,6 @@ export async function POST(request: Request) {
 
       await ensureJobApplicationsColumns();
 
-      // Find candidate user_id & profile_id so we delete any matching application row
       let userId: number | null = null;
       let profileId: number | null = null;
 
@@ -342,7 +395,6 @@ export async function POST(request: Request) {
           )
       `;
 
-      // Also clean up the old JOB_APPLICATION notification in messages so re-applying notifies the employer freshly
       try {
         await sql`
           DELETE FROM messages
@@ -386,7 +438,6 @@ export async function POST(request: Request) {
       }
       const job = jobRows[0];
 
-      // Check if already applied
       const existingApp = await sql`
         SELECT ja.id
         FROM job_applications ja
@@ -406,7 +457,6 @@ export async function POST(request: Request) {
         });
       }
 
-      // Pull candidate profile details from Neon DB
       let candidateId: number | null = null;
       let candidateName = safeString(body?.candidateName, 255);
       let candidatePhone = '';
@@ -466,7 +516,6 @@ export async function POST(request: Request) {
         RETURNING *
       `;
 
-      // Dispatch real-time notification to the Employer's bell icon
       try {
         const employerEmail = await resolveEmployerEmailForJob(job);
         if (employerEmail) {
@@ -541,7 +590,7 @@ export async function POST(request: Request) {
     }
 
     // =========================================================================
-    // BRANCH C: EMPLOYER CREATING A NEW JOB POSTING
+    // BRANCH C: EMPLOYER OR SCOUT AGENT CREATING A NEW JOB POSTING
     // =========================================================================
     const title = safeString(body?.title, 255);
     const workMode = safeString(body?.workMode, 50) || 'Hybrid';
@@ -555,6 +604,13 @@ export async function POST(request: Request) {
     const description = safeString(body?.description, 10000);
     const employerEmail = safeString(body?.employerEmail, 254).toLowerCase();
     const companyName = safeString(body?.companyName, 255);
+
+    // Detect if this job is being published by Rolematch Scout (contains external Source URL)
+    const isScoutAggregatedJob =
+      Boolean(body?.isScoutAgent) ||
+      /(?:Source(?: Application)? URL|Apply URL|Apply online at)\s*:\s*https?:\/\//i.test(
+        description
+      );
 
     if (!title || !experience || !noticePeriod || !description) {
       return NextResponse.json(
@@ -585,8 +641,14 @@ export async function POST(request: Request) {
             LIMIT 1
           `;
           if (emp.length > 0) {
-            resolvedCompany =
-              emp[0].company_name || emp[0].full_name || resolvedCompany;
+            // If it's a Scout Agent job, keep the scraped companyName (Grab, Avaya, YASH, etc.).
+            // If it's a real Employer logging in to post a job directly, use their official profile company_name!
+            if (isScoutAggregatedJob && companyName) {
+              resolvedCompany = companyName;
+            } else {
+              resolvedCompany =
+                emp[0].company_name || emp[0].full_name || resolvedCompany;
+            }
           }
         } catch {}
       }
@@ -644,7 +706,6 @@ export async function PATCH(request: Request) {
   try {
     const body = await request.json();
 
-    // Update Candidate Application ATS Status (Shortlist / Interview / Offer / Reject)
     if (body?.action === 'updateApplicationStatus') {
       const applicationId = safePositiveInt(body?.applicationId);
       const jobId = safePositiveInt(body?.jobId);
@@ -678,7 +739,6 @@ export async function PATCH(request: Request) {
         `;
       }
 
-      // Notify the candidate of their application status update
       if (candidateEmail) {
         const jobTitle = safeString(body?.jobTitle || 'your applied role', 200);
         const companyName = safeString(
@@ -711,7 +771,6 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ success: true, status: newStatus });
     }
 
-    // Standard Job Status Update (ACTIVE / CLOSED / EXPIRED)
     const jobId = safePositiveInt(body?.id);
     const status = safeString(body?.status, 20).toUpperCase();
 
@@ -768,6 +827,9 @@ export async function DELETE(request: Request) {
     } catch {}
     try {
       await sql`DELETE FROM saved_jobs WHERE job_id = ${jobId}`;
+    } catch {}
+    try {
+      await sql`DELETE FROM messages WHERE job_id = ${jobId}`;
     } catch {}
 
     await sql`DELETE FROM jobs WHERE id = ${jobId}`;

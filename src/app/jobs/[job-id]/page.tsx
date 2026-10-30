@@ -23,6 +23,17 @@ interface JobDetail {
   status?: string;
 }
 
+/**
+ * Extracts any external Source URL from the job description text.
+ */
+function extractSourceUrl(description = ''): string | null {
+  if (!description) return null;
+  const match = description.match(
+    /(?:Source(?: Application)? URL|Apply URL|Apply online at)\s*:\s*(https?:\/\/[^\s]+)/i
+  );
+  return match && match[1] ? match[1].trim() : null;
+}
+
 export default function JobDetailPage() {
   const params = useParams();
   const router = useRouter();
@@ -38,6 +49,9 @@ export default function JobDetailPage() {
   );
   const [toast, setToast] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
+
+  // Disclaimer modal state for external job redirection
+  const [showRedirectModal, setShowRedirectModal] = useState(false);
 
   useEffect(() => {
     if (!jobId) {
@@ -78,10 +92,22 @@ export default function JobDetailPage() {
       .finally(() => setLoading(false));
   }, [jobId]);
 
-  const handleApplyNow = async () => {
+  const sourceUrl = extractSourceUrl(job?.description || '');
+
+  /**
+   * Submits the internal application record and, if an external Source URL exists,
+   * redirects the candidate to the official career page after they click OK.
+   */
+  const executeApplicationAndRedirect = async (externalUrl?: string | null) => {
     setErrorMsg('');
+    setShowRedirectModal(false);
+
     const saved = localStorage.getItem('user');
     if (!saved) {
+      if (externalUrl) {
+        window.open(externalUrl, '_blank', 'noopener,noreferrer');
+        return;
+      }
       router.push('/login');
       return;
     }
@@ -97,13 +123,18 @@ export default function JobDetailPage() {
       userRole = String(parsed.role || 'CANDIDATE').toUpperCase();
     } catch {}
 
-    if (!userEmail) {
-      router.push('/login');
+    if (userRole === 'EMPLOYER') {
+      setErrorMsg('Employer accounts cannot apply to jobs.');
       return;
     }
 
-    if (userRole === 'EMPLOYER') {
-      setErrorMsg('Employer accounts cannot apply to jobs.');
+    // Open external career page in a new tab immediately on user click if externalUrl exists
+    if (externalUrl) {
+      window.open(externalUrl, '_blank', 'noopener,noreferrer');
+    }
+
+    if (!userEmail) {
+      if (!externalUrl) router.push('/login');
       return;
     }
 
@@ -125,7 +156,9 @@ export default function JobDetailPage() {
         setHasApplied(true);
         setApplicationStatus(data.applicationStatus || 'APPLIED');
         setToast(
-          data.alreadyApplied
+          externalUrl
+            ? 'Redirected to official job page & marked as Applied!'
+            : data.alreadyApplied
             ? 'You have already applied for this role.'
             : `Application submitted for ${job?.title || 'this role'}!`
         );
@@ -138,6 +171,15 @@ export default function JobDetailPage() {
     } finally {
       setApplying(false);
     }
+  };
+
+  /**
+   * Triggered when the candidate clicks "APPLY NOW".
+   * Always shows the Terms & Conditions confirmation popup before proceeding.
+   */
+  const handleApplyButtonClick = () => {
+    setErrorMsg('');
+    setShowRedirectModal(true);
   };
 
   const handleWithdrawApplication = async () => {
@@ -191,7 +233,7 @@ export default function JobDetailPage() {
     return (
       <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center p-8">
         <div className="bg-slate-900 border border-slate-800 rounded-3xl px-8 py-6 text-sm font-bold text-slate-300 shadow-2xl">
-          Loading job details from Neon database...
+          Loading job details...
         </div>
       </div>
     );
@@ -228,6 +270,14 @@ export default function JobDetailPage() {
         .map((s) => s.trim())
         .filter(Boolean)
     : [];
+
+  // Strip the raw "Source URL: ..." line from the plain text block so we can render it as a clean interactive link at the bottom
+  const cleanDescription = String(job.description || '')
+    .replace(
+      /\n*\s*(?:Source(?: Application)? URL|Apply URL|Apply online at)\s*:\s*https?:\/\/[^\s]+/gi,
+      ''
+    )
+    .trim();
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 font-sans py-10 px-4 sm:px-8">
@@ -303,6 +353,16 @@ export default function JobDetailPage() {
                     : `✓ ${currentAppStage}`}
                 </span>
 
+                {sourceUrl && (
+                  <button
+                    type="button"
+                    onClick={() => setShowRedirectModal(true)}
+                    className="px-5 py-3.5 rounded-full bg-blue-600 hover:bg-blue-500 text-white text-xs font-extrabold uppercase tracking-wider transition cursor-pointer shadow-lg"
+                  >
+                    Visit Job Page ↗
+                  </button>
+                )}
+
                 <button
                   type="button"
                   onClick={handleWithdrawApplication}
@@ -324,7 +384,7 @@ export default function JobDetailPage() {
             ) : (
               <button
                 type="button"
-                onClick={handleApplyNow}
+                onClick={handleApplyButtonClick}
                 disabled={applying}
                 className="px-8 py-3.5 rounded-full bg-white hover:bg-slate-200 disabled:bg-slate-400 text-slate-950 text-xs font-extrabold uppercase tracking-wider transition shadow-xl cursor-pointer"
               >
@@ -347,8 +407,22 @@ export default function JobDetailPage() {
               Job Description
             </h2>
             <div className="text-sm text-slate-300 leading-relaxed whitespace-pre-line">
-              {job.description || 'No description provided by the employer.'}
+              {cleanDescription || 'No description provided by the employer.'}
             </div>
+
+            {/* Source URL kept at the bottom of the job post */}
+            {sourceUrl && (
+              <div className="pt-4 mt-4 border-t border-slate-800/80 text-xs text-slate-400 break-all">
+                <span className="font-bold text-slate-300">Source URL: </span>
+                <button
+                  type="button"
+                  onClick={() => setShowRedirectModal(true)}
+                  className="text-blue-400 hover:text-blue-300 hover:underline text-left cursor-pointer"
+                >
+                  {sourceUrl}
+                </button>
+              </div>
+            )}
           </div>
 
           {/* RIGHT: JOB OVERVIEW */}
@@ -413,6 +487,81 @@ export default function JobDetailPage() {
           </div>
         </div>
       </div>
+
+      {/* =====================================================================
+          TERMS & CONDITIONS / EXTERNAL REDIRECT DISCLAIMER POPUP MODAL
+         ===================================================================== */}
+      {showRedirectModal && (
+        <div
+          className="fixed inset-0 z-[9999999] bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4"
+          onClick={() => setShowRedirectModal(false)}
+        >
+          <div
+            className="bg-slate-900 border border-slate-700 rounded-3xl max-w-md w-full p-7 shadow-2xl space-y-5 relative"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400 text-lg shrink-0">
+                ⚠️
+              </div>
+              <div>
+                <h3 className="text-base font-extrabold text-white">
+                  Moving to Job Posting Page
+                </h3>
+                <p className="text-[11px] text-slate-400">
+                  Please review before proceeding
+                </p>
+              </div>
+            </div>
+
+            <div className="bg-slate-950/80 border border-slate-800 rounded-2xl p-4 text-xs text-slate-300 leading-relaxed space-y-2">
+              <p>
+                You are moving to the job posted page. By clicking{' '}
+                <strong className="text-white">&quot;OK&quot;</strong>, you are
+                agreeing to our{' '}
+                <Link
+                  href="/terms"
+                  target="_blank"
+                  className="text-blue-400 underline hover:text-blue-300"
+                >
+                  Terms &amp; Conditions
+                </Link>{' '}
+                and{' '}
+                <Link
+                  href="/fraud-alert"
+                  target="_blank"
+                  className="text-blue-400 underline hover:text-blue-300"
+                >
+                  Fraud Alert Policy
+                </Link>
+                .
+              </p>
+              <p className="text-[11px] text-slate-400">
+                Never pay any money or security deposit for job interviews or
+                offer letters. Rolematch is not responsible for third-party
+                websites or external recruitment communications.
+              </p>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowRedirectModal(false)}
+                className="px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-bold text-slate-300 hover:text-white transition cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => executeApplicationAndRedirect(sourceUrl)}
+                className="px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-xs font-extrabold uppercase tracking-wider text-white transition shadow-lg cursor-pointer"
+              >
+                OK
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

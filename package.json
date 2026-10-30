@@ -2,7 +2,12 @@
   "name": "jobsite",
   "version": "1.0.0",
   "scripts": {
-    "dev": "next dev"
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "scout": "node scripts/rolematch-scout.mjs",
+    "scout:once": "node scripts/rolematch-scout.mjs --once"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.2.0",

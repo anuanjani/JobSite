@@ -1,5 +1,5 @@
 'use client';
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
@@ -32,15 +32,18 @@ export default function EmployerRegisterPage() {
   const [mobileError, setMobileError] = useState('');
   const [otpError, setOtpError] = useState('');
 
-  // Step 1 Email & Password States
+  // Step 1 Email & Email-Triggered Password States
   const [emailError, setEmailError] = useState('');
+  const [emailSuccessMsg, setEmailSuccessMsg] = useState('');
   const [emailTouched, setEmailTouched] = useState(false);
+  const [emailPasswordSent, setEmailPasswordSent] = useState(false);
+  const [emailCooldown, setEmailCooldown] = useState(0);
   const [showPassword, setShowPassword] = useState(false);
   const [isPasswordFocused, setIsPasswordFocused] = useState(false);
 
   // Shared Button Loading & Error States
   const [loadingAction, setLoadingAction] = useState<
-    'send-otp' | 'verify-otp' | 'step-1' | 'submit' | null
+    'send-otp' | 'verify-otp' | 'send-email-pwd' | 'step-1' | 'submit' | null
   >(null);
   const [formError, setFormError] = useState('');
 
@@ -48,6 +51,15 @@ export default function EmployerRegisterPage() {
   const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
   const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{8,}$/;
   const isPasswordValid = passwordRegex.test(formData.password);
+
+  // Cooldown timer for resending emailed password
+  useEffect(() => {
+    if (emailCooldown <= 0) return;
+    const timer = setInterval(() => {
+      setEmailCooldown((prev) => (prev > 0 ? prev - 1 : 0));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [emailCooldown]);
 
   // Live Email Format Validator (Catches spaces & invalid formats immediately)
   const validateEmailFormat = (rawEmail: string): string => {
@@ -136,7 +148,61 @@ export default function EmployerRegisterPage() {
   };
 
   // ---------------------------------------------------------------------------
-  // STEP 1 HANDLER: VALIDATE EMAIL FORMAT + NEON DB + ENTERPRISE PASSWORD CHECK
+  // STEP 1A HANDLER: REAL-TIME DUPLICATE EMAIL CHECK & SEND PASSWORD TO EMAIL
+  // ---------------------------------------------------------------------------
+  const handleSendPasswordToEmail = async () => {
+    setEmailError('');
+    setEmailSuccessMsg('');
+    setFormError('');
+    setEmailTouched(true);
+
+    const formatErr = validateEmailFormat(formData.email);
+    if (formatErr) {
+      setEmailError(formatErr);
+      return;
+    }
+
+    const cleanEmail = formData.email.trim().toLowerCase();
+    setLoadingAction('send-email-pwd');
+
+    try {
+      const res = await fetch('/api/register/email-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'send',
+          email: cleanEmail,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        setEmailPasswordSent(false);
+        setEmailError(
+          data.error ||
+            'This Email ID is already registered. Please sign in or use a different email.'
+        );
+        return;
+      }
+
+      setEmailPasswordSent(true);
+      setEmailCooldown(30);
+      setEmailSuccessMsg(
+        data.message ||
+          `Verification password sent to ${cleanEmail}. Enter the exact password below.`
+      );
+    } catch {
+      setEmailError(
+        'Failed to trigger verification email. Please check your connection and try again.'
+      );
+    } finally {
+      setLoadingAction(null);
+    }
+  };
+
+  // ---------------------------------------------------------------------------
+  // STEP 1B HANDLER: VALIDATE EMAILED PASSWORD + NEON DB CHECK
   // ---------------------------------------------------------------------------
   const handleContinueStep1 = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -156,10 +222,17 @@ export default function EmployerRegisterPage() {
 
     const cleanEmail = formData.email.trim().toLowerCase();
 
+    if (!emailPasswordSent) {
+      setFormError(
+        'Please click "Get Password" next to your email address to receive your verification password first.'
+      );
+      return;
+    }
+
     if (!isPasswordValid) {
       setIsPasswordFocused(true);
       setFormError(
-        'Password must include uppercase, lowercase, number, special character, and at least 8 characters.'
+        'Please enter the valid enterprise password sent to your email (uppercase, lowercase, number, special character, 8+ chars).'
       );
       return;
     }
@@ -167,18 +240,24 @@ export default function EmployerRegisterPage() {
     setLoadingAction('step-1');
 
     try {
-      await new Promise((r) => setTimeout(r, 1200));
-      const res = await fetch('/api/register/check', {
+      await new Promise((r) => setTimeout(r, 900));
+
+      // Verify that the entered password matches the exact password emailed to the user
+      const verifyRes = await fetch('/api/register/email-password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: cleanEmail }),
+        body: JSON.stringify({
+          action: 'verify',
+          email: cleanEmail,
+          password: formData.password,
+        }),
       });
-      const data = await res.json();
+      const verifyData = await verifyRes.json();
 
-      if (!res.ok || data.exists) {
-        setEmailError(
-          data.error ||
-            'This Email ID is already registered. Please sign in or use a different email.'
+      if (!verifyRes.ok || !verifyData.verified) {
+        setFormError(
+          verifyData.error ||
+            'The password you entered does not match the password sent to your email.'
         );
         setLoadingAction(null);
         return;
@@ -195,7 +274,7 @@ export default function EmployerRegisterPage() {
       setStep(2);
     } catch {
       setEmailError(
-        'Failed to validate email with database. Please try again.'
+        'Failed to validate email password with database. Please try again.'
       );
       setLoadingAction(null);
     }
@@ -222,13 +301,17 @@ export default function EmployerRegisterPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: formData.fullName.trim(),
+          fullName: formData.fullName.trim(),
           email: formData.email.trim().toLowerCase(),
           password: formData.password,
           mobileNumber: formData.mobile.replace(/\D/g, ''),
+          phone: formData.mobile.replace(/\D/g, ''),
           hiringFor: formData.accountType,
           companyName: formData.companyName.trim(),
           industry: formData.industry,
+          industryType: formData.industry,
           employees: formData.employees,
+          employeeCount: formData.employees,
           designation: formData.designation.trim(),
           pincode: formData.pincode.trim(),
           city: formData.city.trim(),
@@ -248,12 +331,17 @@ export default function EmployerRegisterPage() {
       localStorage.setItem(
         'user',
         JSON.stringify({
+          id: data.id || data.user?.id,
           name: formData.fullName.trim(),
           companyName: formData.companyName.trim(),
           email: formData.email.trim().toLowerCase(),
           phone: formData.mobile.replace(/\D/g, ''),
           role: 'EMPLOYER',
         })
+      );
+
+      window.dispatchEvent(
+        new CustomEvent('profile-updated', { detail: data.user || data })
       );
 
       router.push('/employer/dashboard');
@@ -625,7 +713,7 @@ export default function EmployerRegisterPage() {
             )}
 
             {step === 1 && (
-              /* STEP 1: BASIC DETAILS */
+              /* STEP 1: BASIC DETAILS + REAL-TIME EMAIL PASSWORD TRIGGER */
               <div>
                 <div className="flex items-start justify-between mb-6">
                   <div>
@@ -740,61 +828,104 @@ export default function EmployerRegisterPage() {
                     />
                   </div>
 
-                  {/* Official Email ID (Live Format & Space Check + Neon DB Check) */}
+                  {/* Official Email ID + Real-Time Password Email Trigger */}
                   <div>
-                    <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">
-                      OFFICIAL EMAIL ID *
-                    </label>
-                    <input
-                      type="email"
-                      required
-                      placeholder="name@company.com"
-                      value={formData.email}
-                      onBlur={() => {
-                        setEmailTouched(true);
-                        if (formData.email) {
-                          setEmailError(validateEmailFormat(formData.email));
-                        }
-                      }}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        setFormData({ ...formData, email: val });
+                    <div className="flex items-center justify-between mb-2">
+                      <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500">
+                        OFFICIAL EMAIL ID *
+                      </label>
+                      {emailPasswordSent && (
+                        <span className="text-[10px] font-extrabold uppercase tracking-wider text-emerald-400">
+                          ✓ Password Sent to Email
+                        </span>
+                      )}
+                    </div>
 
-                        // Immediately flag spaces or update validation if already touched
-                        if (/\s/.test(val)) {
-                          setEmailError(
-                            'Please correct email format (spaces are not allowed).'
-                          );
-                        } else if (emailTouched && val) {
-                          setEmailError(validateEmailFormat(val));
-                        } else {
-                          setEmailError('');
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
+                      <input
+                        type="email"
+                        required
+                        placeholder="name@company.com"
+                        value={formData.email}
+                        onBlur={() => {
+                          setEmailTouched(true);
+                          if (formData.email) {
+                            setEmailError(validateEmailFormat(formData.email));
+                          }
+                        }}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setFormData({ ...formData, email: val });
+                          setEmailPasswordSent(false);
+                          setEmailSuccessMsg('');
+
+                          if (/\s/.test(val)) {
+                            setEmailError(
+                              'Please correct email format (spaces are not allowed).'
+                            );
+                          } else if (emailTouched && val) {
+                            setEmailError(validateEmailFormat(val));
+                          } else {
+                            setEmailError('');
+                          }
+                        }}
+                        className={`flex-1 bg-slate-900 border rounded-xl px-4 py-3.5 text-sm text-white outline-none transition-colors ${
+                          emailError
+                            ? 'border-red-500 focus:border-red-500'
+                            : 'border-slate-700 focus:border-indigo-500'
+                        }`}
+                      />
+
+                      <button
+                        type="button"
+                        onClick={handleSendPasswordToEmail}
+                        disabled={
+                          loadingAction === 'send-email-pwd' ||
+                          emailCooldown > 0
                         }
-                      }}
-                      className={`w-full bg-slate-900 border rounded-xl px-4 py-3.5 text-sm text-white outline-none transition-colors ${
-                        emailError
-                          ? 'border-red-500 focus:border-red-500'
-                          : 'border-slate-700 focus:border-indigo-500'
-                      }`}
-                    />
+                        className="px-4 py-3.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-800 disabled:text-slate-500 text-white text-[11px] font-extrabold uppercase tracking-wider transition cursor-pointer shrink-0 shadow-lg"
+                      >
+                        {loadingAction === 'send-email-pwd'
+                          ? 'Sending...'
+                          : emailCooldown > 0
+                          ? `Resend (${emailCooldown}s)`
+                          : emailPasswordSent
+                          ? 'Resend Password'
+                          : 'Get Password'}
+                      </button>
+                    </div>
+
                     {emailError && (
                       <p className="text-red-400 text-xs font-bold bg-red-500/10 px-3.5 py-2.5 rounded-xl border border-red-500/20 mt-2 flex items-center gap-2">
                         <span>⚠</span>
                         <span>{emailError}</span>
                       </p>
                     )}
+
+                    {emailSuccessMsg && !emailError && (
+                      <p className="text-emerald-300 text-xs font-bold bg-emerald-500/10 px-3.5 py-2.5 rounded-xl border border-emerald-500/25 mt-2 flex items-center gap-2">
+                        <span>✓</span>
+                        <span>{emailSuccessMsg}</span>
+                      </p>
+                    )}
                   </div>
 
-                  {/* Create Password with Eye Show/Hide Toggle + Enterprise Checklist */}
+                  {/* Password Input with Fixed Vertically Centered Eye Toggle + Enterprise Checklist */}
                   <div className="relative">
                     <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">
-                      CREATE PASSWORD *
+                      {emailPasswordSent
+                        ? 'ENTER PASSWORD RECEIVED ON EMAIL *'
+                        : 'CREATE / VERIFY PASSWORD (SENT ON EMAIL) *'}
                     </label>
-                    <div className="relative">
+                    <div className="relative flex items-center">
                       <input
                         type={showPassword ? 'text' : 'password'}
                         required
-                        placeholder="Create a strong enterprise password"
+                        placeholder={
+                          emailPasswordSent
+                            ? 'Paste the password received on your email'
+                            : 'Click "Get Password" above to receive password on email'
+                        }
                         value={formData.password}
                         onFocus={() => setIsPasswordFocused(true)}
                         onBlur={() => setIsPasswordFocused(false)}
@@ -814,7 +945,8 @@ export default function EmployerRegisterPage() {
                         title={
                           showPassword ? 'Hide password' : 'Show password'
                         }
-                        className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white transition-colors p-1 cursor-pointer"
+                        style={{ top: '50%', transform: 'translateY(-50%)' }}
+                        className="absolute right-3.5 flex items-center justify-center text-slate-400 hover:text-white transition-colors p-1 cursor-pointer"
                       >
                         {showPassword ? (
                           <svg
@@ -857,7 +989,17 @@ export default function EmployerRegisterPage() {
                     {isPasswordFocused && (
                       <div className="absolute left-0 top-[calc(100%+6px)] w-full bg-slate-950 border border-slate-700 p-3.5 rounded-xl shadow-2xl z-50 text-xs text-slate-300 space-y-1.5">
                         <p className="font-bold text-white">
-                          Enterprise password requirements:
+                          Enterprise password verification requirements:
+                        </p>
+                        <p
+                          className={`flex items-center gap-2 ${
+                            emailPasswordSent
+                              ? 'text-emerald-400'
+                              : 'text-amber-400'
+                          }`}
+                        >
+                          <span>{emailPasswordSent ? '✓' : '•'}</span> Must
+                          match the password sent to your official email ID
                         </p>
                         <p
                           className={`flex items-center gap-2 ${
